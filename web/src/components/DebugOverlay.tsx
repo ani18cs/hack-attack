@@ -9,6 +9,7 @@ interface DebugOverlayProps {
   serverLatencyMs: number;
   isOnline: boolean;
   detectedObjects: SceneObject[];
+  currentMode?: string;
 }
 
 export const DebugOverlay: React.FC<DebugOverlayProps> = ({
@@ -19,6 +20,7 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({
   serverLatencyMs,
   isOnline,
   detectedObjects,
+  currentMode = 'idle',
 }) => {
   if (!visible) return null;
 
@@ -62,6 +64,12 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({
             className={`text-base font-bold ${isOnline ? 'text-emerald-400' : 'text-red-400'}`}
           >
             {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </span>
+        </div>
+        <div className="bg-zinc-900 p-2 rounded col-span-2">
+          <span className="text-zinc-400 block text-[10px]">ACTIVE MODE</span>
+          <span className="text-sm font-bold text-yellow-400 uppercase tracking-wider font-mono">
+            {currentMode}
           </span>
         </div>
       </div>

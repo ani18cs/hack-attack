@@ -25,6 +25,10 @@ export const Hazard: React.FC<HazardProps> = ({ onStop }) => {
 
     const runHazardCheck = async () => {
       if (inFlightRef.current) return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setStatusText('Offline. Hazard scan requires internet connection.');
+        return;
+      }
 
       const frame = camera.captureFrame(1024, 0.7);
       if (!frame) return;

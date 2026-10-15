@@ -146,6 +146,7 @@ export type VoiceIntent =
   | 'STOP'
   | 'REPEAT'
   | 'HELP'
+  | 'PRIVACY'
   | 'UNKNOWN';
 
 export type ActiveMode =

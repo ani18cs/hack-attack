@@ -19,6 +19,12 @@ export const Currency: React.FC<CurrencyProps> = ({ onStop }) => {
 
   const handleScan = async () => {
     if (isProcessing) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const msg = 'I need internet for that.';
+      setStatusText(msg);
+      speech.speak(msg, { priority: 'normal' });
+      return;
+    }
     setIsProcessing(true);
     speech.speak('Checking currency...', { priority: 'normal' });
 

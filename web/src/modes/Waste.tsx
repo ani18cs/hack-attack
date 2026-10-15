@@ -19,6 +19,12 @@ export const Waste: React.FC<WasteProps> = ({ onStop }) => {
 
   const handleClassify = async () => {
     if (isProcessing) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const msg = 'I need internet for that.';
+      setStatusText(msg);
+      speech.speak(msg, { priority: 'normal' });
+      return;
+    }
     setIsProcessing(true);
     speech.speak('Checking waste item...', { priority: 'normal' });
 
