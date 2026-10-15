@@ -46,7 +46,7 @@ visionRouter.post('/describe', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const { data, mimeType } = cleanBase64(image);
 
     const describeSchema = {
@@ -135,7 +135,7 @@ visionRouter.post('/read', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const { data, mimeType } = cleanBase64(image);
 
     const readSchema = {
@@ -227,7 +227,7 @@ visionRouter.post('/find', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const { data, mimeType } = cleanBase64(image);
 
     const findSchema = {

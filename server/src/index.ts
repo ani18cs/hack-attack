@@ -54,7 +54,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     timestamp: Date.now(),
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     hasApiKey: !!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('PLACEHOLDER'),
   });
 });
