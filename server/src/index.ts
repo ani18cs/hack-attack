@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import { ttsRouter } from './routes/tts.js';
 import { visionRouter } from './routes/vision.js';
 
 // Load environment variables
@@ -56,11 +57,13 @@ app.get('/api/health', (_req, res) => {
     timestamp: Date.now(),
     model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     hasApiKey: !!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('PLACEHOLDER'),
+    hasSarvamKey: !!process.env.SARVAM_API_KEY && !process.env.SARVAM_API_KEY.includes('PLACEHOLDER'),
   });
 });
 
-// Vision proxy routes
+// Vision & TTS proxy routes
 app.use('/api', visionRouter);
+app.use('/api', ttsRouter);
 
 // Global 404 handler
 app.use((_req, res) => {
