@@ -231,10 +231,10 @@ export const FindWashroom: React.FC<FindWashroomProps> = ({
   const getDirectionArrow = (dir?: Direction) => {
     switch (dir) {
       case 'left':
-      case 'slightly left':
+      case 'slightly-left':
         return '⬅️';
       case 'right':
-      case 'slightly right':
+      case 'slightly-right':
         return '➡️';
       case 'ahead':
         return '⬆️';

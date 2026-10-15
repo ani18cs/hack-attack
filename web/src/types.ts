@@ -77,11 +77,13 @@ export interface ReadData {
   texts: ReadTextItem[];
 }
 
+export type GenderKind = 'men' | 'women' | 'unisex' | 'unknown';
+
 export interface FindData {
   found: boolean;
   direction: Direction;
   distance: DistanceBucket;
-  gender?: 'men' | 'women' | 'unisex' | 'unknown';
+  gender?: GenderKind;
   cue: string;
 }
 

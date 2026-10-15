@@ -129,6 +129,28 @@ export const api = {
   read: (image: string, lang = 'en') =>
     api.analyze<ReadData>({ task: 'read', image, lang }),
 
+  readText: async (image: string, lang = 'en') => {
+    const res = await api.read(image, lang);
+    return {
+      summary: res.summary,
+      texts: res.data?.texts || [],
+      confidence: res.confidence,
+      error: res.error,
+    };
+  },
+
   find: (image: string, target = 'restroom', lang = 'en') =>
     api.analyze<FindData>({ task: 'find', image, target, lang }),
+
+  findTarget: async (image: string, target = 'restroom', lang = 'en') => {
+    const res = await api.find(image, target, lang);
+    return {
+      found: res.data?.found ?? false,
+      direction: res.data?.direction ?? 'unknown',
+      gender: res.data?.gender ?? 'unknown',
+      confidence: res.confidence,
+      cue: res.data?.cue || res.summary,
+      error: res.error,
+    };
+  },
 };
