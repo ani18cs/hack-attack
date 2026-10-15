@@ -1,4 +1,5 @@
 import { VoiceIntent } from '../types';
+import { earcons } from './earcons';
 import { KEYWORD_INTENTS } from './i18n';
 import { speech } from './speech';
 
@@ -174,6 +175,87 @@ class VoiceRecognizer {
 
   public isListening(): boolean {
     return this.running;
+  }
+
+  /**
+   * One-shot listen session for tap-to-ask.
+   * Plays earcon on start and end. Ends on silence with 8s maximum timeout.
+   */
+  public async listenOnce(maxDurationMs = 8000): Promise<string | null> {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    this.stop();
+    earcons.listenStart();
+
+    return new Promise<string | null>((resolve) => {
+      if (typeof window === 'undefined') {
+        earcons.listenEnd();
+        resolve(null);
+        return;
+      }
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        console.warn('SpeechRecognition API not supported.');
+        earcons.listenEnd();
+        resolve(null);
+        return;
+      }
+
+      let capturedText: string | null = null;
+      let hasEnded = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      const cleanup = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        this.notifyStatus(false);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        earcons.listenEnd();
+        try {
+          onceRec.stop();
+        } catch (_) {}
+        resolve(capturedText && capturedText.trim().length > 0 ? capturedText.trim() : null);
+      };
+
+      const onceRec = new SpeechRec();
+      onceRec.continuous = false;
+      onceRec.interimResults = false;
+      onceRec.lang = this.currentLang;
+
+      onceRec.onresult = (event: SpeechRecognitionEventLike) => {
+        const lastIndex = event.results.length - 1;
+        if (lastIndex >= 0) {
+          capturedText = event.results[lastIndex][0].transcript;
+        }
+      };
+
+      onceRec.onerror = (e) => {
+        console.warn('[Voice] listenOnce error:', e);
+        cleanup();
+      };
+
+      onceRec.onend = () => {
+        cleanup();
+      };
+
+      this.notifyStatus(true);
+      try {
+        onceRec.start();
+      } catch (err) {
+        console.warn('[Voice] listenOnce start error:', err);
+        cleanup();
+        return;
+      }
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+      }, maxDurationMs);
+    });
   }
 
   public routeIntent(transcript: string): RoutedIntent {

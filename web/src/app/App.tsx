@@ -1,323 +1,337 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { BigButton } from '../components/BigButton';
-import { CameraPreviewHUD } from '../components/CameraPreviewHUD';
-import { DebugOverlay } from '../components/DebugOverlay';
-import { StatusBanner } from '../components/StatusBanner';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { GestureHandler } from '../ask/gestureHandler';
+import { routeUserRequest } from '../ask/router';
+import { toolRuntime, type ToolRuntimeStatus } from '../ask/toolRuntime';
+import type { RouterTool } from '../ask/types';
+import { ControlPanel } from '../components/ControlPanel';
 import { camera } from '../core/camera';
 import { earcons } from '../core/earcons';
 import { haptics } from '../core/haptics';
-import { PHRASES, SupportedLocale } from '../core/i18n';
 import { networkMonitor } from '../core/network';
 import { settings } from '../core/settings';
 import { speech } from '../core/speech';
 import { voice } from '../core/voice';
-import { AroundMe } from '../modes/AroundMe';
-import { Currency } from '../modes/Currency';
-import { Find } from '../modes/Find';
-import { Hazard } from '../modes/Hazard';
-import { Label } from '../modes/Label';
-import { Navigate } from '../modes/Navigate';
-import { ObstacleAlert } from '../modes/ObstacleAlert';
-import { Read } from '../modes/Read';
-import { Sos } from '../modes/Sos';
-import { Waste } from '../modes/Waste';
-import { ActiveMode, SceneObject, VoiceIntent } from '../types';
+import type { SceneObject } from '../types';
+import { announcer } from '../vision/announcer';
 import { detector } from '../vision/detector';
 import { processSpatialObject } from '../vision/spatial';
 
 export const App: React.FC = () => {
   const [hasStarted, setHasStarted] = useState(false);
-  const [activeMode, setActiveMode] = useState<ActiveMode>('idle');
-  const [statusMessage, setStatusMessage] = useState('Tap giant button to start');
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [locale, setLocale] = useState<SupportedLocale>('en-IN');
-  const [findTarget, setFindTarget] = useState('washroom');
-  const [showMoreTools, setShowMoreTools] = useState(false);
-
-  // Diagnostics / Dashboard state
-  const [showDashboard, setShowDashboard] = useState(settings.getSettings().dashboardVisible);
-  const [fps] = useState(8.5);
-  const [detectorLatencyMs] = useState(62);
-  const [serverLatencyMs] = useState(0);
+  const [isThinking, setIsThinking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [runtimeStatus, setRuntimeStatus] = useState<ToolRuntimeStatus>(toolRuntime.getStatus());
+  const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
+
+  // Diagnostics and live detections
   const [detectedObjects, setDetectedObjects] = useState<SceneObject[]>([]);
-  const tapCountRef = useRef(0);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [fps, setFps] = useState(8.5);
+  const [detectorLatencyMs] = useState(55);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const phrases = PHRASES[locale] || PHRASES['en-IN'];
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isListeningRef = useRef(false);
+  const isThinkingRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const lastDangerAlertTime = useRef(0);
 
-  // Subscribe to speech, voice, and network status
+  // Sync refs for event handlers without re-creating listeners
+  useEffect(() => {
+    isListeningRef.current = isListening;
+    isThinkingRef.current = isThinking;
+    isSpeakingRef.current = isSpeaking;
+  }, [isListening, isThinking, isSpeaking]);
+
+  // Subscribe to speech, runtime, and network
   useEffect(() => {
     const unsubSpeech = speech.subscribe((speaking) => setIsSpeaking(speaking));
-    const unsubVoice = voice.onStatusChange((listening) => setIsListening(listening));
-    const unsubNetwork = networkMonitor.subscribe((online: boolean) => setIsOnline(online));
-
-    const unsubIntent = voice.subscribe((routed) => {
-      handleVoiceIntent(routed.intent, routed.raw);
-    });
+    const unsubRuntime = toolRuntime.subscribe((status) => setRuntimeStatus(status));
+    const unsubNetwork = networkMonitor.subscribe((online) => setIsOnline(online));
 
     return () => {
       unsubSpeech();
-      unsubVoice();
+      unsubRuntime();
       unsubNetwork();
-      unsubIntent();
     };
-  }, [activeMode, locale]);
+  }, []);
 
-  // Hook detector for live bounding boxes when experience has started
+  /* -------------------------------------------------------------------------- */
+  /* Ask Flow / Push-to-Talk Logic                                             */
+  /* -------------------------------------------------------------------------- */
+  const handleStartListening = async () => {
+    if (isListeningRef.current || isThinkingRef.current) return;
+
+    // Stop active speech before listening
+    if (speech.isSpeaking()) {
+      speech.stop();
+    }
+
+    setIsListening(true);
+    isListeningRef.current = true;
+
+    try {
+      const transcript = await voice.listenOnce(8000);
+      setIsListening(false);
+      isListeningRef.current = false;
+
+      if (!transcript) {
+        speech.speak("I didn't catch that. Tap and try again.", { priority: 'normal' });
+        return;
+      }
+
+      setIsThinking(true);
+      isThinkingRef.current = true;
+
+      // Handle SOS verbal confirmation if SOS flow is armed
+      if (toolRuntime.isSosPending()) {
+        const lower = transcript.toLowerCase();
+        if (
+          lower.includes('yes') ||
+          lower.includes('confirm') ||
+          lower.includes('send') ||
+          lower.includes('haan') ||
+          lower.includes('sari') ||
+          lower.includes('howdu')
+        ) {
+          setIsThinking(false);
+          isThinkingRef.current = false;
+          await toolRuntime.confirmSos();
+          return;
+        } else if (
+          lower.includes('no') ||
+          lower.includes('cancel') ||
+          lower.includes('stop') ||
+          lower.includes('nahi') ||
+          lower.includes('bedi')
+        ) {
+          setIsThinking(false);
+          isThinkingRef.current = false;
+          toolRuntime.cancelSos();
+          return;
+        }
+      }
+
+      // Route the user request (fastPath -> /api/ask -> clarify)
+      const toolCall = await routeUserRequest(transcript, () => {
+        handleStartListening();
+      });
+
+      setIsThinking(false);
+      isThinkingRef.current = false;
+
+      if (toolCall) {
+        await toolRuntime.execute(toolCall);
+      }
+    } catch (err: any) {
+      console.warn('[App] Listening / ask flow error:', err);
+      setIsListening(false);
+      setIsThinking(false);
+      isListeningRef.current = false;
+      isThinkingRef.current = false;
+      speech.speak("Sorry, I couldn't understand. Try again.", { priority: 'normal' });
+    }
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /* Gestures Configuration                                                     */
+  /* -------------------------------------------------------------------------- */
+  const gestureHandler = useMemo(() => {
+    return new GestureHandler(
+      {
+        onSingleTap: () => {
+          handleStartListening();
+        },
+        onDoubleTap: () => {
+          if (toolRuntime.isSosPending()) {
+            // Double tap confirms emergency SOS
+            toolRuntime.confirmSos();
+          } else {
+            // Double tap repeats last answer
+            toolRuntime.handleRepeatLast();
+          }
+        },
+        onTripleTap: () => {
+          // Triple tap starts SOS confirmation deterministically
+          toolRuntime.startSosConfirmation();
+        },
+        onLongPress: () => {
+          // Long press opens hidden Control Panel
+          setIsControlPanelOpen(true);
+        },
+      },
+      { tapWindowMs: 350, longPressMs: 800 }
+    );
+  }, []);
+
+  /* -------------------------------------------------------------------------- */
+  /* Layer 1: Continuous Obstacle Tracking & Danger Interrupt                   */
+  /* -------------------------------------------------------------------------- */
   useEffect(() => {
     if (!hasStarted) return;
     let isMounted = true;
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
 
-    // Attach camera to video element
-    if (videoRef.current) {
-      camera.setVideoElement(videoRef.current);
-    }
-
-    const startTracking = async () => {
+    const startLayer1 = async () => {
       try {
         await detector.loadModel();
         if (!isMounted) return;
-        if (videoRef.current) {
-          detector.startDetection(videoRef.current);
+
+        const video = videoRef.current || camera.getVideoElement();
+        if (video) {
+          detector.startDetection(video);
         }
       } catch (err) {
-        console.warn('COCO-SSD initial load delayed or failed:', err);
+        console.warn('[Layer 1] Detector start warning:', err);
       }
     };
 
-    startTracking();
+    startLayer1();
 
     const unsubDetector = detector.subscribe((rawDetections) => {
       if (!isMounted) return;
-      const video = videoRef.current;
+
+      // Estimate FPS
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFrameTime >= 1000) {
+        setFps(Math.round((frameCount * 1000) / (now - lastFrameTime) * 10) / 10);
+        frameCount = 0;
+        lastFrameTime = now;
+      }
+
+      const video = videoRef.current || camera.getVideoElement();
       const vw = video?.videoWidth || 640;
       const vh = video?.videoHeight || 480;
+
       const objects = rawDetections.map((d) => processSpatialObject(d, vw, vh));
       setDetectedObjects(objects);
+
+      // Render detection boxes on viewfinder HUD
+      renderOverlay(rawDetections, vw, vh);
+
+      // Layer 1 deterministic safety guard: obstacle danger alert
+      const dangerObject = objects.find((o) => o.danger);
+      if (dangerObject) {
+        // Accelerating proximity beeps
+        let beepInterval = 500;
+        if (dangerObject.distance === 'very-close') beepInterval = 130;
+        else if (dangerObject.distance === 'close') beepInterval = 280;
+
+        earcons.startProximityBeep(beepInterval, 700);
+
+        const currentTime = Date.now();
+        if (currentTime - lastDangerAlertTime.current >= 2400) {
+          lastDangerAlertTime.current = currentTime;
+          haptics.pulseDanger();
+          speech.speak(`Stop. ${dangerObject.label} ahead.`, { priority: 'danger' });
+        }
+      } else {
+        earcons.stopProximityBeep();
+      }
+
+      // Layer 1 non-danger announcer: suppressed during listening or speaking
+      if (!isListeningRef.current && !isSpeakingRef.current && settings.getSettings().verbosity !== 'quiet') {
+        announcer.process(objects);
+      }
     });
 
     return () => {
       isMounted = false;
       unsubDetector();
+      earcons.stopProximityBeep();
     };
   }, [hasStarted]);
 
-  // Handle Voice Intent routing
-  const handleVoiceIntent = (intent: VoiceIntent, transcript: string) => {
-    console.log(`[Voice] Intent: ${intent}, Transcript: "${transcript}"`);
+  /* -------------------------------------------------------------------------- */
+  /* Bounding Boxes Viewfinder Renderer                                         */
+  /* -------------------------------------------------------------------------- */
+  const renderOverlay = (
+    detections: Array<{ bbox: [number, number, number, number]; label: string; score: number }>,
+    videoWidth: number,
+    videoHeight: number
+  ) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Voice shortcut to toggle dashboard
-    if (transcript.toLowerCase().includes('dashboard')) {
-      toggleDashboard();
-      return;
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
     }
 
-    switch (intent) {
-      case 'AROUND_ME':
-        startMode('around_me', 'Starting Around Me mode.');
-        break;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      case 'READ':
-        startMode('read', 'Starting Read mode. Point camera at sign.');
-        break;
+    const scaleX = canvas.width / videoWidth;
+    const scaleY = canvas.height / videoHeight;
 
-      case 'FIND': {
-        const lower = transcript.toLowerCase();
-        let target = 'washroom';
-        const findMatch = lower.match(/find\s+(?:my\s+|the\s+)?([a-z0-9\s]+)/i);
-        if (findMatch && findMatch[1]) {
-          target = findMatch[1].trim();
-        }
-        setFindTarget(target);
-        startMode('find', `Scanning for ${target}. Turn slowly.`);
-        break;
-      }
+    detections.forEach((det) => {
+      const [x, y, w, h] = det.bbox;
+      const rx = x * scaleX;
+      const ry = y * scaleY;
+      const rw = w * scaleX;
+      const rh = h * scaleY;
 
-      case 'CURRENCY':
-        startMode('currency', 'Starting Currency Reader.');
-        break;
+      const isPersonOrVehicle = det.label === 'person' || det.label === 'car' || det.label === 'bus';
+      const strokeColor = isPersonOrVehicle ? '#ef4444' : '#eab308';
 
-      case 'WASTE':
-        startMode('waste', 'Starting Waste Sorter.');
-        break;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(rx, ry, rw, rh);
 
-      case 'LABEL':
-        startMode('label', 'Starting Label Reader.');
-        break;
+      // Label badge
+      const labelText = `${det.label} ${Math.round(det.score * 100)}%`;
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      const textWidth = ctx.measureText(labelText).width;
 
-      case 'HAZARD':
-        startMode('hazard', 'Starting Hazard Scan.');
-        break;
+      ctx.fillStyle = strokeColor;
+      ctx.fillRect(rx, ry - 20 > 0 ? ry - 20 : ry, textWidth + 10, 20);
 
-      case 'SOS':
-        startMode('sos', 'SOS emergency mode activated.');
-        break;
-
-      case 'NAVIGATE':
-        startMode('navigate', 'Starting Venue Navigation.');
-        break;
-
-      case 'OBSTACLE_ON':
-        startMode('obstacle_alert', 'Obstacle alert activated.');
-        break;
-
-      case 'OBSTACLE_OFF':
-      case 'STOP':
-        stopMode();
-        break;
-
-      case 'VERBOSITY_QUIET':
-        settings.updateSettings({ verbosity: 'quiet' });
-        speech.speak('Quiet mode enabled. Hazards only.', { priority: 'normal' });
-        break;
-
-      case 'VERBOSITY_NORMAL':
-        settings.updateSettings({ verbosity: 'normal' });
-        speech.speak('Normal verbosity enabled.', { priority: 'normal' });
-        break;
-
-      case 'VERBOSITY_DETAILED':
-        settings.updateSettings({ verbosity: 'detailed' });
-        speech.speak('Detailed mode enabled.', { priority: 'normal' });
-        break;
-
-      case 'LANGUAGE_EN':
-        setLocale('en-IN');
-        speech.setLang('en-IN');
-        speech.speak('English language selected.', { priority: 'normal' });
-        break;
-
-      case 'LANGUAGE_HI':
-        setLocale('hi-IN');
-        speech.setLang('hi-IN');
-        speech.speak('Hindi language selected.', { priority: 'normal' });
-        break;
-
-      case 'LANGUAGE_KN':
-        setLocale('kn-IN');
-        speech.setLang('kn-IN');
-        speech.speak('Kannada language selected.', { priority: 'normal' });
-        break;
-
-      case 'HELP':
-        speech.speak(phrases.commandHelp, { priority: 'normal' });
-        setStatusMessage(phrases.commandHelp);
-        break;
-
-      case 'REPEAT':
-        speech.speak(statusMessage, { priority: 'normal' });
-        break;
-
-      case 'PRIVACY': {
-        const privMsg = 'Pictures are never saved. They are only sent when you ask.';
-        speech.speak(privMsg, { priority: 'normal' });
-        setStatusMessage(privMsg);
-        break;
-      }
-
-      case 'UNKNOWN':
-      default:
-        speech.speak('Say help for options.', { priority: 'low' });
-        break;
-    }
+      ctx.fillStyle = '#000000';
+      ctx.fillText(labelText, rx + 5, ry - 20 > 0 ? ry - 5 : ry + 15);
+    });
   };
 
-  /**
-   * Single user gesture unlock:
-   * Speech synthesis + Web Audio + Camera + Mic + iOS Motion/Orientation permissions
-   */
+  /* -------------------------------------------------------------------------- */
+  /* Single Gesture Start Experience Unlock                                     */
+  /* -------------------------------------------------------------------------- */
   const handleStartExperience = async () => {
     haptics.pulseConfirm();
     earcons.success();
     setHasStarted(true);
-    setStatusMessage('Initializing sensors and audio...');
 
-    // 1. Unlock speech synthesis
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.resume();
     }
 
-    // 2. Request iOS DeviceOrientation & DeviceMotion permissions if available
     try {
       if (typeof (DeviceOrientationEvent as any)?.requestPermission === 'function') {
         await (DeviceOrientationEvent as any).requestPermission();
       }
-      if (typeof (DeviceMotionEvent as any)?.requestPermission === 'function') {
-        await (DeviceMotionEvent as any).requestPermission();
-      }
-    } catch (permErr) {
-      console.warn('iOS motion permission not granted:', permErr);
-    }
+    } catch (_) {}
 
-    // 3. Connect rear camera
     try {
       await camera.start();
       if (videoRef.current) {
         camera.setVideoElement(videoRef.current);
       }
     } catch (err: any) {
-      console.warn('Camera initialization warning:', err);
+      console.warn('[App] Camera start warning:', err);
       speech.speak('Camera permission denied or camera unavailable.', { priority: 'danger' });
     }
 
-    // 4. Start speech recognition
-    voice.start();
-
-    // 5. Short spoken welcome and commands
+    // First-run spoken welcome per spec
     const welcome =
-      'Welcome to SightLine. I am your spatial navigation assistant. Say around me, read text, find washroom, or help.';
-    setStatusMessage('SightLine Ready');
+      'SightLine is on. Obstacle alerts are active. Tap anywhere and ask me anything.';
     speech.speak(welcome, { priority: 'normal' });
   };
 
-  const startMode = (mode: ActiveMode, spokenConfirmation: string) => {
-    haptics.pulseConfirm();
-    setActiveMode(mode);
-    setStatusMessage(spokenConfirmation);
-    speech.speak(spokenConfirmation, { priority: 'normal' });
-  };
-
-  const stopMode = () => {
-    haptics.pulseInfo();
-    setActiveMode('idle');
-    const msg = phrases.stopped;
-    setStatusMessage(msg);
-    speech.speak(msg, { priority: 'normal' });
-  };
-
-  const speakButton = (name: string) => {
-    speech.speak(name, { priority: 'low' });
-  };
-
-  // Triple-tap header title to toggle judge diagnostics dashboard
-  const handleTitleClick = () => {
-    tapCountRef.current += 1;
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-
-    if (tapCountRef.current >= 3) {
-      tapCountRef.current = 0;
-      toggleDashboard();
-    } else {
-      tapTimerRef.current = setTimeout(() => {
-        tapCountRef.current = 0;
-      }, 500);
-    }
-  };
-
-  const toggleDashboard = () => {
-    setShowDashboard((prev) => {
-      const next = !prev;
-      settings.updateSettings({ dashboardVisible: next });
-      speech.speak(next ? 'Judge dashboard opened.' : 'Judge dashboard closed.', {
-        priority: 'low',
-      });
-      return next;
-    });
-  };
-
+  /* -------------------------------------------------------------------------- */
+  /* Render: Welcome Screen                                                     */
+  /* -------------------------------------------------------------------------- */
   if (!hasStarted) {
     return (
       <main className="h-screen w-screen flex flex-col items-center justify-center p-4 bg-black select-none">
@@ -325,229 +339,136 @@ export const App: React.FC = () => {
           type="button"
           onClick={handleStartExperience}
           className="touch-target w-full h-full max-w-lg max-h-[85vh] bg-yellow-400 text-black font-black text-4xl sm:text-5xl rounded-3xl border-8 border-yellow-200 shadow-[0_0_60px_rgba(255,221,0,0.6)] flex flex-col items-center justify-center gap-6 p-6 active:scale-98 transition-transform focus:ring-8 focus:ring-white"
-          aria-label="Start SightLine Assistant. Tap anywhere on this giant button to unlock camera and audio."
+          aria-label="Start SightLine Assistant. Tap anywhere on this screen to unlock camera and audio."
         >
           <span className="text-8xl">👁️🔊</span>
           <span className="text-center">START SIGHTLINE</span>
           <span className="text-base sm:text-lg font-semibold text-zinc-900 bg-yellow-300 px-6 py-2 rounded-full">
-            Tap screen to unlock audio & camera
+            Tap anywhere to start
           </span>
         </button>
       </main>
     );
   }
 
+  /* -------------------------------------------------------------------------- */
+  /* Render: ONE Single Screen Eyes-Free UI                                     */
+  /* -------------------------------------------------------------------------- */
   return (
-    <div className="min-h-screen w-full flex flex-col bg-black text-white select-none">
-      <header onClick={handleTitleClick} className="cursor-pointer">
-        <StatusBanner
-          status={statusMessage}
-          isListening={isListening}
-          isSpeaking={isSpeaking}
-        />
-      </header>
-
-      {/* Live Camera Viewfinder HUD with real-time detection boxes */}
-      <div className="px-3 pt-2 max-w-lg mx-auto w-full">
-        <CameraPreviewHUD
-          videoRef={videoRef}
-          detectedObjects={detectedObjects}
-          fps={fps}
-          activeModeName={activeMode}
-          isOnline={isOnline}
-        />
-      </div>
-
-      {/* Hidden judge diagnostics dashboard */}
-      <DebugOverlay
-        visible={showDashboard}
-        onClose={() => setShowDashboard(false)}
-        fps={fps}
-        detectorLatencyMs={detectorLatencyMs}
-        serverLatencyMs={serverLatencyMs}
-        isOnline={isOnline}
-        detectedObjects={detectedObjects}
-        currentMode={activeMode}
+    <div className="relative h-screen w-screen overflow-hidden bg-black select-none">
+      {/* 1. Full-Bleed Live Camera View */}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        autoPlay
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        aria-hidden="true"
       />
 
-      {activeMode === 'idle' && (
-        <main className="flex-1 flex flex-col p-3 max-w-lg mx-auto w-full gap-3 py-2">
-          {/* 1. Core Primary Modes (Huge tactile targets, decluttered & high-contrast) */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <BigButton
-              label="Around Me"
-              variant="primary"
-              className="h-28 text-lg"
-              onClick={() => startMode('around_me', 'Starting Around Me mode.')}
-              onFocus={() => speakButton('Around Me')}
-              icon="🧭"
-              ariaDescription="Describes objects and surroundings in real time"
-            />
-            <BigButton
-              label="Read Signs"
-              variant="primary"
-              className="h-28 text-lg"
-              onClick={() => startMode('read', 'Starting Read mode. Point camera at sign.')}
-              onFocus={() => speakButton('Read Signs')}
-              icon="📖"
-              ariaDescription="Reads signboards, exit signs, and text"
-            />
-            <BigButton
-              label="Obstacle Alert"
-              variant="danger"
-              className="h-28 text-lg"
-              onClick={() => startMode('obstacle_alert', 'Obstacle alert activated.')}
-              onFocus={() => speakButton('Obstacle Alert')}
-              icon="🛡️"
-              ariaDescription="Real-time warning for fast-approaching obstacles"
-            />
-            <BigButton
-              label="Find Target"
-              variant="warning"
-              className="h-28 text-lg"
-              onClick={() => {
-                setFindTarget('washroom');
-                startMode('find', 'Scanning for washroom. Turn slowly.');
-              }}
-              onFocus={() => speakButton('Find Washroom')}
-              icon="🚻"
-              ariaDescription="Locates washrooms and specified targets"
-            />
-          </div>
+      {/* 2. Detection Overlay Canvas for Bounding Boxes */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none z-10"
+        aria-hidden="true"
+      />
 
-          {/* 2. Urgent Emergency SOS Bar */}
-          <button
-            type="button"
-            onClick={() => startMode('sos', 'SOS emergency mode activated.')}
-            onFocus={() => speakButton('Emergency SOS')}
-            className="w-full py-3.5 px-4 bg-red-600 hover:bg-red-500 active:scale-98 text-white font-black text-lg rounded-2xl border-2 border-red-400 shadow-lg flex items-center justify-center gap-3 transition-transform"
-            aria-label="Emergency SOS. Double tap or say SOS to broadcast emergency context."
-          >
-            <span className="text-2xl">🆘</span>
-            <span>EMERGENCY SOS (Say "SOS")</span>
-          </button>
+      {/* 3. Compact Floating Status Chip (Top) */}
+      <div className="absolute top-4 inset-x-0 z-20 flex justify-center pointer-events-none px-4">
+        <div
+          role="status"
+          aria-live="polite"
+          className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full border-2 shadow-2xl backdrop-blur-md text-sm sm:text-base font-bold transition-all ${
+            isListening
+              ? 'bg-red-600/90 border-red-300 text-white animate-pulse'
+              : isThinking
+              ? 'bg-purple-600/90 border-purple-300 text-white animate-pulse'
+              : isSpeaking
+              ? 'bg-blue-600/90 border-blue-300 text-white'
+              : runtimeStatus.sosConfirmationPending
+              ? 'bg-red-700 border-red-300 text-white animate-bounce'
+              : runtimeStatus.activeTool
+              ? 'bg-yellow-400/90 border-yellow-200 text-black'
+              : !isOnline
+              ? 'bg-zinc-800/90 border-amber-500 text-amber-200'
+              : 'bg-black/75 border-zinc-700 text-zinc-200'
+          }`}
+        >
+          {isListening && <span className="animate-ping text-base">🔴</span>}
+          {isThinking && <span className="text-base">🧠</span>}
+          {isSpeaking && <span className="text-base">🔊</span>}
+          {runtimeStatus.sosConfirmationPending && <span className="text-base">🆘</span>}
+          {!isOnline && <span className="text-base">⚠️</span>}
 
-          {/* 3. Decluttered Collapsible "More Tools" Drawer */}
-          <div className="border border-zinc-800 rounded-2xl bg-zinc-950 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setShowMoreTools((prev) => {
-                  const next = !prev;
-                  speech.speak(next ? 'More tools expanded.' : 'More tools collapsed.', {
-                    priority: 'low',
-                  });
-                  return next;
-                });
-              }}
-              className="w-full py-3 px-4 flex items-center justify-between text-zinc-300 hover:text-white font-bold text-sm bg-zinc-900/80 active:bg-zinc-800 transition-colors"
-              aria-expanded={showMoreTools}
-            >
-              <div className="flex items-center gap-2">
-                <span>🧰</span>
-                <span>{showMoreTools ? 'Hide Extra Tools' : 'More Assistant Tools (5)'}</span>
-              </div>
-              <span className="text-xs text-yellow-400 font-mono">
-                {showMoreTools ? '▲ COLLAPSE' : '▼ EXPAND'}
-              </span>
-            </button>
+          <span>
+            {isListening
+              ? 'Listening... Speak now'
+              : isThinking
+              ? 'Thinking...'
+              : runtimeStatus.sosConfirmationPending
+              ? 'Confirm SOS? Say Yes or Double-Tap'
+              : isSpeaking
+              ? 'Speaking...'
+              : runtimeStatus.activeTool
+              ? `Active: ${runtimeStatus.activeTool.replace('_', ' ')}`
+              : !isOnline
+              ? 'Offline · Safety Active'
+              : 'SightLine Ready · Tap to Ask'}
+          </span>
+        </div>
+      </div>
 
-            {showMoreTools && (
-              <div className="p-2.5 grid grid-cols-2 gap-2">
-                <BigButton
-                  label="Currency"
-                  variant="neutral"
-                  className="h-20 text-sm"
-                  onClick={() => startMode('currency', 'Starting Currency Reader.')}
-                  onFocus={() => speakButton('Currency')}
-                  icon="💵"
-                  ariaDescription="Identifies currency note denomination"
-                />
-                <BigButton
-                  label="Waste Bin"
-                  variant="neutral"
-                  className="h-20 text-sm"
-                  onClick={() => startMode('waste', 'Starting Waste Sorter.')}
-                  onFocus={() => speakButton('Waste Bin')}
-                  icon="♻️"
-                  ariaDescription="Guides waste item disposal into correct bin"
-                />
-                <BigButton
-                  label="Label Reader"
-                  variant="neutral"
-                  className="h-20 text-sm"
-                  onClick={() => startMode('label', 'Starting Label Reader.')}
-                  onFocus={() => speakButton('Label Reader')}
-                  icon="🏷️"
-                  ariaDescription="Reads product packaging and allergens"
-                />
-                <BigButton
-                  label="Hazard Scan"
-                  variant="neutral"
-                  className="h-20 text-sm"
-                  onClick={() => startMode('hazard', 'Starting Hazard Scan.')}
-                  onFocus={() => speakButton('Hazard Scan')}
-                  icon="⚠️"
-                  ariaDescription="Scans for stairs, drop-offs, and floor hazards"
-                />
-                <div className="col-span-2">
-                  <BigButton
-                    label="Navigate Venue"
-                    variant="neutral"
-                    className="h-16 text-sm w-full"
-                    onClick={() => startMode('navigate', 'Starting Venue Navigation.')}
-                    onFocus={() => speakButton('Navigate Venue')}
-                    icon="🗺️"
-                    ariaDescription="Turn-by-turn indoor venue navigation"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+      {/* 4. One Giant Touch Target Covering Entire Screen */}
+      <button
+        type="button"
+        role="button"
+        aria-label={
+          isListening
+            ? 'Listening to your request'
+            : runtimeStatus.sosConfirmationPending
+            ? 'Emergency confirmation pending. Double tap to send emergency message, or single tap and say yes or no.'
+            : 'Tap anywhere to ask. Double tap to repeat last answer. Triple tap for emergency SOS. Hold for control panel.'
+        }
+        onPointerDown={() => gestureHandler.onPointerDown()}
+        onPointerUp={() => gestureHandler.onPointerUp()}
+        onPointerCancel={() => gestureHandler.onPointerCancel()}
+        onClick={() => gestureHandler.registerTap()}
+        className="absolute inset-0 w-full h-full z-15 bg-transparent cursor-pointer focus:outline-none active:bg-white/5 transition-colors"
+      >
+        <span className="sr-only">Tap to ask</span>
+      </button>
 
-          {/* 4. Footer Help Button */}
-          <footer className="pt-1">
-            <BigButton
-              label="Stop / Help (Say Help)"
-              variant="neutral"
-              className="w-full h-14 text-base"
-              onClick={() => speech.speak(phrases.commandHelp, { priority: 'normal' })}
-              ariaDescription="Speak command instructions and options"
-            />
-          </footer>
-        </main>
-      )}
+      {/* 5. Minimal Eyes-Free Hint Footer for Sighted Judges */}
+      <div className="absolute bottom-5 inset-x-0 z-20 flex justify-center pointer-events-none px-4">
+        <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-zinc-800 text-zinc-400 text-xs text-center space-y-0.5">
+          <p className="font-semibold text-zinc-300">
+            Single tap: Ask anything · Double tap: Repeat · Triple tap: SOS
+          </p>
+          <p className="text-[11px] text-zinc-500">Hold 800ms for Control Panel · Obstacle guard is always on</p>
+        </div>
+      </div>
 
-      {/* Mode Screen Mounts */}
-      {activeMode === 'around_me' && (
-        <AroundMe
-          onStop={stopMode}
-          onDescribeOnce={() => {
-            speech.speak('Analyzing scene...', { priority: 'normal' });
-            setStatusMessage('Capturing scene...');
-          }}
-        />
-      )}
-
-      {activeMode === 'read' && <Read onStop={stopMode} />}
-
-      {activeMode === 'find' && (
-        <Find onStop={stopMode} target={findTarget} />
-      )}
-
-      {activeMode === 'obstacle_alert' && <ObstacleAlert onStop={stopMode} />}
-
-      {activeMode === 'currency' && <Currency onStop={stopMode} />}
-
-      {activeMode === 'waste' && <Waste onStop={stopMode} />}
-
-      {activeMode === 'label' && <Label onStop={stopMode} />}
-
-      {activeMode === 'hazard' && <Hazard onStop={stopMode} />}
-
-      {activeMode === 'navigate' && <Navigate onStop={stopMode} />}
-
-      {activeMode === 'sos' && <Sos onStop={stopMode} />}
+      {/* 6. Hidden Control Panel Overlay */}
+      <ControlPanel
+        isOpen={isControlPanelOpen}
+        onClose={() => setIsControlPanelOpen(false)}
+        fps={fps}
+        detectorLatencyMs={detectorLatencyMs}
+        serverLatencyMs={0}
+        isOnline={isOnline}
+        detectedObjects={detectedObjects}
+        onSelectTool={async (tool: RouterTool, args?: Record<string, any>) => {
+          await toolRuntime.execute({
+            tool,
+            args: args || {},
+            confidence: 1.0,
+            source: 'local',
+          });
+        }}
+        onTriggerSos={() => {
+          toolRuntime.startSosConfirmation();
+        }}
+      />
     </div>
   );
 };

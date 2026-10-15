@@ -30,7 +30,8 @@ export type VisionTask =
   | 'label'
   | 'hazard'
   | 'verify_landmark'
-  | 'sos_context';
+  | 'sos_context'
+  | 'ask';
 
 export interface AnalyzeRequest {
   task: VisionTask;
@@ -115,6 +116,11 @@ export interface SosContextData {
 
 export interface HazardData {
   hazards: HazardAlert[];
+}
+
+export interface AskData {
+  answer: string;
+  confidence: number;
 }
 
 // Health check contract
