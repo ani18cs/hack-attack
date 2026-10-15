@@ -40,6 +40,10 @@ export class SpatialAnnouncer {
       }
     }
 
+    // Respect verbosity: quiet suppresses non-danger announcements
+    const verbosity = settings.getSettings().verbosity;
+    if (verbosity === 'quiet') return;
+
     // 2. Filter candidate objects worth announcing (ignore 'far')
     const candidates = objects.filter((o) => o.distance !== 'far' && !o.danger);
     if (candidates.length === 0) return;

@@ -7,7 +7,6 @@ export interface BeaconTarget {
 
 class SpatialAudioBeacon {
   private ctx: AudioContext | null = null;
-  private panner: PannerNode | StereoPannerNode | null = null;
   private intervalId: ReturnType<typeof setTimeout> | null = null;
   private isRunning = false;
 
@@ -134,8 +133,9 @@ class SpatialAudioBeacon {
     }
 
     // Stereo Panner fallback
-    if ('createStereoPanner' in ctx) {
-      const stereoPanner = ctx.createStereoPanner();
+    const ctxAny = ctx as any;
+    if (typeof ctxAny.createStereoPanner === 'function') {
+      const stereoPanner = ctxAny.createStereoPanner();
       stereoPanner.pan.setValueAtTime(panX, ctx.currentTime);
       osc.connect(gain);
       gain.connect(stereoPanner);

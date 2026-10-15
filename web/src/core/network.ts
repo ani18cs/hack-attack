@@ -35,3 +35,4 @@ class NetworkMonitor {
 }
 
 export const network = new NetworkMonitor();
+export const networkMonitor = network;
