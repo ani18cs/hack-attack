@@ -81,11 +81,11 @@ Scan the resulting HTTPS URL on your phone's browser.
 
 ## 📜 Team & Module Ownership
 
-| Role | Lead | Focus |
-|---|---|---|
-| **Role A** | App & Accessibility | App Shell, Giant UI, Speech Queue, Voice Intent Router, Haptics, PWA |
-| **Role B** | Vision | Camera, COCO-SSD, Spatial Calculation, Announcer Cooldown, Obstacle Alert |
-| **Role C** | AI & Server | Express Proxy, Gemini Prompts & Schemas, Read Mode, Find Washroom |
+| Role | Lead | Focus | Dedicated Guide |
+|---|---|---|---|
+| **Role A** | App & Accessibility | App Shell, Giant UI, Speech Queue, Voice Intent Router, Haptics, PWA | [📖 Role A Guide](docs/TEAM_MEMBER_A_APP_A11Y.md) |
+| **Role B** | Vision | Camera, COCO-SSD, Spatial Calculation, Announcer Cooldown, Obstacle Alert | [📖 Role B Guide](docs/TEAM_MEMBER_B_VISION.md) |
+| **Role C** | AI & Server | Express Proxy, Gemini Prompts & Schemas, Read Mode, Find Washroom | [📖 Role C Guide](docs/TEAM_MEMBER_C_AI_SERVER.md) |
 
 ---
 
