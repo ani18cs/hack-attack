@@ -1,12 +1,20 @@
 /**
  * Pedometer / step estimator using DeviceMotionEvent.
- * Requires user gesture permission on iOS 13+.
+ * Features:
+ * - Low-pass gravity smoothing + high-pass dynamic acceleration filter
+ * - Minimum peak interval of 250 ms (human gait limit)
+ * - Calibration multiplier for user gait length
+ * - Standardized "about N steps" phrasing helper
  */
 export class StepTracker {
   private stepCount = 0;
   private isTracking = false;
-  private lastAccel = 0;
-  private threshold = 11.5; // m/s^2 peak threshold for walking
+  private lastStepTime = 0;
+  private filteredAccel = 9.81;
+  private alpha = 0.2; // Low-pass filter coefficient
+  private minStepIntervalMs = 250; // Minimum 250 ms between steps
+  private peakThreshold = 1.35; // Acceleration deviation threshold (m/s^2 above smoothed baseline)
+  private calibrationFactor = 1.0;
   private listeners: Set<(steps: number) => void> = new Set();
 
   public async requestPermission(): Promise<boolean> {
@@ -45,8 +53,19 @@ export class StepTracker {
     this.notify();
   }
 
+  public addManualStep(): void {
+    this.stepCount++;
+    this.notify();
+  }
+
   public getSteps(): number {
-    return this.stepCount;
+    return Math.round(this.stepCount * this.calibrationFactor);
+  }
+
+  public calibrate(actualStepsCounted: number, countedByDevice: number): void {
+    if (countedByDevice > 0 && actualStepsCounted > 0) {
+      this.calibrationFactor = actualStepsCounted / countedByDevice;
+    }
   }
 
   public onStep(listener: (steps: number) => void): () => void {
@@ -54,19 +73,33 @@ export class StepTracker {
     return () => this.listeners.delete(listener);
   }
 
+  public static formatSteps(n: number): string {
+    const rounded = Math.round(n);
+    if (rounded <= 1) return 'about 1 step';
+    return `about ${rounded} steps`;
+  }
+
   private notify() {
-    this.listeners.forEach((fn) => fn(this.stepCount));
+    const effectiveSteps = this.getSteps();
+    this.listeners.forEach((fn) => fn(effectiveSteps));
   }
 
   private handleMotion = (event: DeviceMotionEvent) => {
-    const acc = event.accelerationIncludingGravity;
+    const acc = event.accelerationIncludingGravity || event.acceleration;
     if (!acc || acc.x === null || acc.y === null || acc.z === null) return;
 
-    const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-    const delta = magnitude - this.lastAccel;
-    this.lastAccel = magnitude;
+    const rawMagnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
 
-    if (magnitude > this.threshold && delta > 2.0) {
+    // Apply low-pass filter to isolate continuous gravity vector
+    this.filteredAccel = this.alpha * rawMagnitude + (1 - this.alpha) * this.filteredAccel;
+    const dynamicMagnitude = Math.abs(rawMagnitude - this.filteredAccel);
+
+    const now = Date.now();
+    if (
+      dynamicMagnitude > this.peakThreshold &&
+      now - this.lastStepTime >= this.minStepIntervalMs
+    ) {
+      this.lastStepTime = now;
       this.stepCount++;
       this.notify();
     }

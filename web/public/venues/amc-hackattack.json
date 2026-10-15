@@ -1,0 +1,132 @@
+{
+  "venue": {
+    "id": "amc-hackattack",
+    "name": "AMC Engineering College",
+    "defaultLang": "en"
+  },
+  "landmarks": [
+    {
+      "id": "entrance",
+      "name": "Main Entrance",
+      "aliases": ["gate", "entry", "reception", "main door", "foyer"],
+      "signText": ["WELCOME", "AMC", "ENGINEERING"],
+      "qr": "LM-ENTRANCE",
+      "type": "entrance",
+      "names": {
+        "hi": "मुख्य प्रवेशद्वार",
+        "kn": "ಮುಖ್ಯ ದ್ವಾರ"
+      }
+    },
+    {
+      "id": "washroom-g",
+      "name": "Washroom Ground Floor",
+      "aliases": ["toilet", "restroom", "wc", "washroom", "gents", "ladies", "bathroom", "loo"],
+      "signText": ["WC", "GENTS", "TOILET", "RESTROOM"],
+      "qr": "LM-WASH1",
+      "type": "washroom",
+      "names": {
+        "hi": "शौचालय",
+        "kn": "ಶೌಚಾಲಯ"
+      }
+    },
+    {
+      "id": "hackathon-hall",
+      "name": "Hackathon Seminar Hall (TODO-VERIFY)",
+      "aliases": ["hall", "seminar hall", "hackattack hall", "auditorium"],
+      "signText": ["SEMINAR HALL", "HACKATTACK"],
+      "qr": "LM-HALL",
+      "type": "event_hall",
+      "names": {
+        "hi": "हैकथॉन हॉल",
+        "kn": "ಹ್ಯಾಕಥಾನ್ ಸಭಾಂಗಣ"
+      }
+    },
+    {
+      "id": "cafeteria",
+      "name": "College Cafeteria (TODO-VERIFY)",
+      "aliases": ["canteen", "cafe", "food court", "mess"],
+      "signText": ["CAFETERIA", "CANTEEN"],
+      "qr": "LM-CAFE",
+      "type": "amenity",
+      "names": {
+        "hi": "कैंटीन",
+        "kn": "ಉಪಹಾರ ಗೃಹ"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "from": "entrance",
+      "to": "washroom-g",
+      "steps": [
+        {
+          "text": "Walk straight about 20 steps along the main corridor.",
+          "steps": 20,
+          "turn": "straight"
+        },
+        {
+          "text": "Turn left at the corridor intersection.",
+          "turn": "left",
+          "headingChange": -90
+        },
+        {
+          "text": "Walk about 10 steps. The washroom door is on your right.",
+          "steps": 10,
+          "checkpoint": {
+            "landmarkId": "washroom-g",
+            "expectSignText": ["WC", "GENTS"]
+          }
+        }
+      ]
+    },
+    {
+      "from": "washroom-g",
+      "to": "entrance",
+      "steps": [
+        {
+          "text": "Turn around and walk about 10 steps down the corridor.",
+          "steps": 10,
+          "turn": "u_turn",
+          "headingChange": 180
+        },
+        {
+          "text": "Turn right into the main lobby.",
+          "turn": "right",
+          "headingChange": 90
+        },
+        {
+          "text": "Walk about 20 steps. The main exit gate is straight ahead.",
+          "steps": 20,
+          "checkpoint": {
+            "landmarkId": "entrance",
+            "expectSignText": ["WELCOME", "AMC"]
+          }
+        }
+      ]
+    },
+    {
+      "from": "entrance",
+      "to": "hackathon-hall",
+      "steps": [
+        {
+          "text": "Walk straight about 35 steps toward the seminar block (TODO-VERIFY).",
+          "steps": 35,
+          "turn": "straight"
+        },
+        {
+          "text": "Turn right into the seminar foyer.",
+          "turn": "right",
+          "headingChange": 90
+        },
+        {
+          "text": "Walk about 8 steps to the hall doors.",
+          "steps": 8,
+          "checkpoint": {
+            "landmarkId": "hackathon-hall",
+            "expectSignText": ["SEMINAR HALL", "HACKATTACK"]
+          }
+        }
+      ]
+    }
+  ]
+}
