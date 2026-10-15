@@ -67,7 +67,7 @@ export async function generateVisionJSON<T = any>(options: GeminiGenerateOptions
     throw new Error('GEMINI_API_KEY is not configured in server/.env');
   }
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
   const timeoutMs = options.timeoutMs ?? 10000;
   const { data, mimeType } = cleanBase64(options.imageBase64);
 

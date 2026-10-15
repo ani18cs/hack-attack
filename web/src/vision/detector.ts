@@ -81,10 +81,13 @@ class DetectorController {
     }));
   }
 
+  private videoElement: HTMLVideoElement | null = null;
+
   /**
    * Starts real-time detection on the provided video element.
    */
   public startDetection(videoElement: HTMLVideoElement): void {
+    this.videoElement = videoElement;
     if (this.isDetecting) return;
     this.isDetecting = true;
 
@@ -93,17 +96,19 @@ class DetectorController {
     const loop = async (timestamp: number) => {
       if (!this.isDetecting) return;
 
+      const v = this.videoElement;
       if (
         document.visibilityState !== 'hidden' &&
-        videoElement.readyState >= 2 &&
-        videoElement.videoWidth > 0 &&
+        v &&
+        v.readyState >= 2 &&
+        v.videoWidth > 0 &&
         timestamp - this.lastRunTime >= frameIntervalMs
       ) {
         this.lastRunTime = timestamp;
 
         if (this.model) {
           try {
-            const predictions = await this.model.detect(videoElement);
+            const predictions = await this.model.detect(v);
             const validDetections: RawDetection[] = predictions
               .filter((p) => p.score >= this.minScore)
               .map((p) => ({

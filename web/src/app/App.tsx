@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BigButton } from '../components/BigButton';
+import { CameraPreviewHUD } from '../components/CameraPreviewHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { StatusBanner } from '../components/StatusBanner';
 import { camera } from '../core/camera';
@@ -21,6 +22,8 @@ import { Read } from '../modes/Read';
 import { Sos } from '../modes/Sos';
 import { Waste } from '../modes/Waste';
 import { ActiveMode, SceneObject, VoiceIntent } from '../types';
+import { detector } from '../vision/detector';
+import { processSpatialObject } from '../vision/spatial';
 
 export const App: React.FC = () => {
   const [hasStarted, setHasStarted] = useState(false);
@@ -30,6 +33,7 @@ export const App: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [locale, setLocale] = useState<SupportedLocale>('en-IN');
   const [findTarget, setFindTarget] = useState('washroom');
+  const [showMoreTools, setShowMoreTools] = useState(false);
 
   // Diagnostics / Dashboard state
   const [showDashboard, setShowDashboard] = useState(settings.getSettings().dashboardVisible);
@@ -37,11 +41,11 @@ export const App: React.FC = () => {
   const [detectorLatencyMs] = useState(62);
   const [serverLatencyMs] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [detectedObjects] = useState<SceneObject[]>([]);
+  const [detectedObjects, setDetectedObjects] = useState<SceneObject[]>([]);
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const phrases = PHRASES[locale] || PHRASES['en-IN'];
 
   // Subscribe to speech, voice, and network status
@@ -61,6 +65,45 @@ export const App: React.FC = () => {
       unsubIntent();
     };
   }, [activeMode, locale]);
+
+  // Hook detector for live bounding boxes when experience has started
+  useEffect(() => {
+    if (!hasStarted) return;
+    let isMounted = true;
+
+    // Attach camera to video element
+    if (videoRef.current) {
+      camera.setVideoElement(videoRef.current);
+    }
+
+    const startTracking = async () => {
+      try {
+        await detector.loadModel();
+        if (!isMounted) return;
+        if (videoRef.current) {
+          detector.startDetection(videoRef.current);
+        }
+      } catch (err) {
+        console.warn('COCO-SSD initial load delayed or failed:', err);
+      }
+    };
+
+    startTracking();
+
+    const unsubDetector = detector.subscribe((rawDetections) => {
+      if (!isMounted) return;
+      const video = videoRef.current;
+      const vw = video?.videoWidth || 640;
+      const vh = video?.videoHeight || 480;
+      const objects = rawDetections.map((d) => processSpatialObject(d, vw, vh));
+      setDetectedObjects(objects);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubDetector();
+    };
+  }, [hasStarted]);
 
   // Handle Voice Intent routing
   const handleVoiceIntent = (intent: VoiceIntent, transcript: string) => {
@@ -211,8 +254,9 @@ export const App: React.FC = () => {
 
     // 3. Connect rear camera
     try {
+      await camera.start();
       if (videoRef.current) {
-        await camera.start(videoRef.current);
+        camera.setVideoElement(videoRef.current);
       }
     } catch (err: any) {
       console.warn('Camera initialization warning:', err);
@@ -277,7 +321,6 @@ export const App: React.FC = () => {
   if (!hasStarted) {
     return (
       <main className="h-screen w-screen flex flex-col items-center justify-center p-4 bg-black select-none">
-        <video ref={videoRef} className="hidden" playsInline muted autoPlay />
         <button
           type="button"
           onClick={handleStartExperience}
@@ -296,8 +339,6 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-black text-white select-none">
-      <video ref={videoRef} className="hidden" playsInline muted autoPlay />
-
       <header onClick={handleTitleClick} className="cursor-pointer">
         <StatusBanner
           status={statusMessage}
@@ -305,6 +346,17 @@ export const App: React.FC = () => {
           isSpeaking={isSpeaking}
         />
       </header>
+
+      {/* Live Camera Viewfinder HUD with real-time detection boxes */}
+      <div className="px-3 pt-2 max-w-lg mx-auto w-full">
+        <CameraPreviewHUD
+          videoRef={videoRef}
+          detectedObjects={detectedObjects}
+          fps={fps}
+          activeModeName={activeMode}
+          isOnline={isOnline}
+        />
+      </div>
 
       {/* Hidden judge diagnostics dashboard */}
       <DebugOverlay
@@ -319,9 +371,9 @@ export const App: React.FC = () => {
       />
 
       {activeMode === 'idle' && (
-        <main className="flex-1 flex flex-col p-4 max-w-lg mx-auto w-full justify-between gap-4 py-4">
-          <div className="grid grid-cols-2 gap-3 flex-1">
-            {/* Core Part 1 Features */}
+        <main className="flex-1 flex flex-col p-3 max-w-lg mx-auto w-full gap-3 py-2">
+          {/* 1. Core Primary Modes (Huge tactile targets, decluttered & high-contrast) */}
+          <div className="grid grid-cols-2 gap-2.5">
             <BigButton
               label="Around Me"
               variant="primary"
@@ -330,15 +382,6 @@ export const App: React.FC = () => {
               onFocus={() => speakButton('Around Me')}
               icon="🧭"
               ariaDescription="Describes objects and surroundings in real time"
-            />
-            <BigButton
-              label="Obstacle Alert"
-              variant="danger"
-              className="h-28 text-lg"
-              onClick={() => startMode('obstacle_alert', 'Obstacle alert activated.')}
-              onFocus={() => speakButton('Obstacle Alert')}
-              icon="🛡️"
-              ariaDescription="Real-time warning for fast-approaching obstacles"
             />
             <BigButton
               label="Read Signs"
@@ -350,7 +393,16 @@ export const App: React.FC = () => {
               ariaDescription="Reads signboards, exit signs, and text"
             />
             <BigButton
-              label="Find Washroom"
+              label="Obstacle Alert"
+              variant="danger"
+              className="h-28 text-lg"
+              onClick={() => startMode('obstacle_alert', 'Obstacle alert activated.')}
+              onFocus={() => speakButton('Obstacle Alert')}
+              icon="🛡️"
+              ariaDescription="Real-time warning for fast-approaching obstacles"
+            />
+            <BigButton
+              label="Find Target"
               variant="warning"
               className="h-28 text-lg"
               onClick={() => {
@@ -359,71 +411,106 @@ export const App: React.FC = () => {
               }}
               onFocus={() => speakButton('Find Washroom')}
               icon="🚻"
-              ariaDescription="Locates washrooms and restrooms"
-            />
-
-            {/* Part 2 Mode Buttons (All have tactile buttons and voice intents) */}
-            <BigButton
-              label="Currency"
-              variant="neutral"
-              className="h-24 text-base"
-              onClick={() => startMode('currency', 'Starting Currency Reader.')}
-              onFocus={() => speakButton('Currency')}
-              icon="💵"
-              ariaDescription="Identifies currency note denomination"
-            />
-            <BigButton
-              label="Waste Bin"
-              variant="neutral"
-              className="h-24 text-base"
-              onClick={() => startMode('waste', 'Starting Waste Sorter.')}
-              onFocus={() => speakButton('Waste Bin')}
-              icon="♻️"
-              ariaDescription="Guides waste item disposal into correct bin"
-            />
-            <BigButton
-              label="Label Reader"
-              variant="neutral"
-              className="h-24 text-base"
-              onClick={() => startMode('label', 'Starting Label Reader.')}
-              onFocus={() => speakButton('Label Reader')}
-              icon="🏷️"
-              ariaDescription="Reads product packaging and allergens"
-            />
-            <BigButton
-              label="Hazard Scan"
-              variant="neutral"
-              className="h-24 text-base"
-              onClick={() => startMode('hazard', 'Starting Hazard Scan.')}
-              onFocus={() => speakButton('Hazard Scan')}
-              icon="⚠️"
-              ariaDescription="Scans for stairs, drop-offs, and floor hazards"
-            />
-            <BigButton
-              label="Navigate"
-              variant="neutral"
-              className="h-24 text-base"
-              onClick={() => startMode('navigate', 'Starting Venue Navigation.')}
-              onFocus={() => speakButton('Navigate Venue')}
-              icon="🗺️"
-              ariaDescription="Turn-by-turn indoor venue navigation"
-            />
-            <BigButton
-              label="Emergency SOS"
-              variant="danger"
-              className="h-24 text-base"
-              onClick={() => startMode('sos', 'SOS emergency mode activated.')}
-              onFocus={() => speakButton('Emergency SOS')}
-              icon="🆘"
-              ariaDescription="Broadcasts emergency context and location"
+              ariaDescription="Locates washrooms and specified targets"
             />
           </div>
 
-          <footer className="pt-2">
+          {/* 2. Urgent Emergency SOS Bar */}
+          <button
+            type="button"
+            onClick={() => startMode('sos', 'SOS emergency mode activated.')}
+            onFocus={() => speakButton('Emergency SOS')}
+            className="w-full py-3.5 px-4 bg-red-600 hover:bg-red-500 active:scale-98 text-white font-black text-lg rounded-2xl border-2 border-red-400 shadow-lg flex items-center justify-center gap-3 transition-transform"
+            aria-label="Emergency SOS. Double tap or say SOS to broadcast emergency context."
+          >
+            <span className="text-2xl">🆘</span>
+            <span>EMERGENCY SOS (Say "SOS")</span>
+          </button>
+
+          {/* 3. Decluttered Collapsible "More Tools" Drawer */}
+          <div className="border border-zinc-800 rounded-2xl bg-zinc-950 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setShowMoreTools((prev) => {
+                  const next = !prev;
+                  speech.speak(next ? 'More tools expanded.' : 'More tools collapsed.', {
+                    priority: 'low',
+                  });
+                  return next;
+                });
+              }}
+              className="w-full py-3 px-4 flex items-center justify-between text-zinc-300 hover:text-white font-bold text-sm bg-zinc-900/80 active:bg-zinc-800 transition-colors"
+              aria-expanded={showMoreTools}
+            >
+              <div className="flex items-center gap-2">
+                <span>🧰</span>
+                <span>{showMoreTools ? 'Hide Extra Tools' : 'More Assistant Tools (5)'}</span>
+              </div>
+              <span className="text-xs text-yellow-400 font-mono">
+                {showMoreTools ? '▲ COLLAPSE' : '▼ EXPAND'}
+              </span>
+            </button>
+
+            {showMoreTools && (
+              <div className="p-2.5 grid grid-cols-2 gap-2">
+                <BigButton
+                  label="Currency"
+                  variant="neutral"
+                  className="h-20 text-sm"
+                  onClick={() => startMode('currency', 'Starting Currency Reader.')}
+                  onFocus={() => speakButton('Currency')}
+                  icon="💵"
+                  ariaDescription="Identifies currency note denomination"
+                />
+                <BigButton
+                  label="Waste Bin"
+                  variant="neutral"
+                  className="h-20 text-sm"
+                  onClick={() => startMode('waste', 'Starting Waste Sorter.')}
+                  onFocus={() => speakButton('Waste Bin')}
+                  icon="♻️"
+                  ariaDescription="Guides waste item disposal into correct bin"
+                />
+                <BigButton
+                  label="Label Reader"
+                  variant="neutral"
+                  className="h-20 text-sm"
+                  onClick={() => startMode('label', 'Starting Label Reader.')}
+                  onFocus={() => speakButton('Label Reader')}
+                  icon="🏷️"
+                  ariaDescription="Reads product packaging and allergens"
+                />
+                <BigButton
+                  label="Hazard Scan"
+                  variant="neutral"
+                  className="h-20 text-sm"
+                  onClick={() => startMode('hazard', 'Starting Hazard Scan.')}
+                  onFocus={() => speakButton('Hazard Scan')}
+                  icon="⚠️"
+                  ariaDescription="Scans for stairs, drop-offs, and floor hazards"
+                />
+                <div className="col-span-2">
+                  <BigButton
+                    label="Navigate Venue"
+                    variant="neutral"
+                    className="h-16 text-sm w-full"
+                    onClick={() => startMode('navigate', 'Starting Venue Navigation.')}
+                    onFocus={() => speakButton('Navigate Venue')}
+                    icon="🗺️"
+                    ariaDescription="Turn-by-turn indoor venue navigation"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 4. Footer Help Button */}
+          <footer className="pt-1">
             <BigButton
               label="Stop / Help (Say Help)"
               variant="neutral"
-              className="w-full h-16 text-lg"
+              className="w-full h-14 text-base"
               onClick={() => speech.speak(phrases.commandHelp, { priority: 'normal' })}
               ariaDescription="Speak command instructions and options"
             />

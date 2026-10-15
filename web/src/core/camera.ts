@@ -80,7 +80,7 @@ class CameraController {
   /**
    * Captures the current video frame, downscales to max 1024px wide, and returns a JPEG base64 string.
    */
-  public captureFrame(maxWidth = 1024, quality = 0.7): string | null {
+  public captureFrame(maxWidth = 720, quality = 0.65): string | null {
     if (!this.videoElement || this.videoElement.videoWidth === 0) {
       return null;
     }

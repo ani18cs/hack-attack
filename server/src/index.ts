@@ -10,6 +10,7 @@ import { ttsRouter } from './routes/tts.js';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 8787;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
 

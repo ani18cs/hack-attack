@@ -1,5 +1,6 @@
 import { VoiceIntent } from '../types';
 import { KEYWORD_INTENTS } from './i18n';
+import { speech } from './speech';
 
 interface SpeechRecognitionEventLike {
   results: {
@@ -48,9 +49,17 @@ class VoiceRecognizer {
   private intentHandlers: Set<IntentHandler> = new Set();
   private statusListeners: Set<(isListening: boolean) => void> = new Set();
   private restartTimeout: ReturnType<typeof setTimeout> | null = null;
+  private lastSpeechEndTime = 0;
 
   constructor() {
     this.initRecognition();
+    if (typeof window !== 'undefined') {
+      speech.subscribe((speaking) => {
+        if (!speaking) {
+          this.lastSpeechEndTime = Date.now();
+        }
+      });
+    }
   }
 
   private initRecognition(): void {
@@ -69,6 +78,11 @@ class VoiceRecognizer {
       this.recognition.lang = this.currentLang;
 
       this.recognition.onresult = (event: SpeechRecognitionEventLike) => {
+        // Acoustic echo cancellation: ignore mic input while AI is speaking or for 700ms afterwards
+        if (speech.isSpeaking() || Date.now() - this.lastSpeechEndTime < 700) {
+          return;
+        }
+
         const lastIndex = event.results.length - 1;
         if (lastIndex >= 0) {
           const transcript = event.results[lastIndex][0].transcript.trim().toLowerCase();
