@@ -45,6 +45,7 @@ export function buildFindPrompt(req: AnalyzeRequest): string {
   const lang = req.lang || 'en';
 
   return `You assist a blind user searching for a specific object or destination in the camera view.
+Report only what is in the walking path ahead; ignore the periphery.
 Target to find: "${target}".
 
 Guidelines for washroom/toilet/restroom:

@@ -46,6 +46,7 @@ export const describeGeminiSchema = {
 export function buildDescribePrompt(req: AnalyzeRequest): string {
   const lang = req.lang || 'en';
   return `Analyze this camera frame for a visually impaired user.
+Report only what is in the walking path ahead; ignore the periphery.
 Identify up to 5 navigation-relevant items (doors, stairs, people, furniture, obstacles).
 For each item, give its label, spatial direction (left, slightly-left, ahead, slightly-right, right), and distance (very-close, close, near, far).
 Provide a concise spoken summary <= 25 words mentioning key items and their positions.

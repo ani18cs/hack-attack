@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { SceneObject } from '../types';
+import { FOCUS_CONFIG } from '../vision/focus';
 
 interface CameraPreviewHUDProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -12,7 +13,7 @@ interface CameraPreviewHUDProps {
 /**
  * Live Camera Preview HUD with real-time bounding box annotations.
  * Renders the actual live camera video feed with overlaid bounding boxes,
- * confidence labels, spatial direction, and collision warnings.
+ * corridor boundaries, zone labels, and collision warnings.
  */
 export const CameraPreviewHUD: React.FC<CameraPreviewHUDProps> = ({
   videoRef,
@@ -42,6 +43,44 @@ export const CameraPreviewHUD: React.FC<CameraPreviewHUDProps> = ({
 
     // Clear previous frame
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the walking path corridor rectangle and zone labels
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const corridorLeft = cw * FOCUS_CONFIG.corridor.xMin;
+    const corridorRight = cw * FOCUS_CONFIG.corridor.xMax;
+    const corridorWidth = corridorRight - corridorLeft;
+    const corridorTop = ch * FOCUS_CONFIG.ignoreTop;
+    const corridorHeight = ch - corridorTop;
+
+    // 1. Upper Ignored Zone
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+    ctx.fillRect(0, 0, cw, corridorTop);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('Upper Zone (Ignored)', 10, Math.min(20, corridorTop - 6));
+
+    // 2. Side Danger-Only Zones
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+    ctx.fillRect(0, corridorTop, corridorLeft, corridorHeight);
+    ctx.fillRect(corridorRight, corridorTop, cw - corridorRight, corridorHeight);
+
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.85)';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillText('Side Zone (Danger only)', 10, corridorTop + 20);
+    ctx.fillText('Side Zone (Danger only)', Math.max(10, cw - 130), corridorTop + 20);
+
+    // 3. Central Walking Corridor Box
+    ctx.save();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(corridorLeft, corridorTop, corridorWidth, corridorHeight);
+    ctx.restore();
+
+    ctx.fillStyle = '#22c55e';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillText('Walking Path Corridor', corridorLeft + 8, corridorTop + 18);
 
     if (detectedObjects.length === 0) {
       // Subtle center targeting crosshair
@@ -95,7 +134,9 @@ export const CameraPreviewHUD: React.FC<CameraPreviewHUDProps> = ({
       ctx.fillRect(bx, by, bw, bh);
 
       // 2. Draw label badge with rounded pill
-      const labelText = `${isDanger ? '⚠️ ' : ''}${obj.label.toUpperCase()} ${(obj.score * 100).toFixed(0)}% · ${obj.direction} · ${obj.distance}`;
+      const zoneStr = obj.zone ? `[${obj.zone}] ` : '';
+      const distStr = obj.formattedDistance || obj.distance;
+      const labelText = `${isDanger ? '⚠️ ' : ''}${zoneStr}${obj.label.toUpperCase()} · ${distStr} · ${obj.direction}`;
       ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
       const textMetrics = ctx.measureText(labelText);
       const textWidth = textMetrics.width;

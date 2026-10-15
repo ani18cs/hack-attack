@@ -29,6 +29,7 @@ export function buildAskPrompt(req: AnalyzeRequest): string {
   return `You assist a blind user asking a specific question about what is in front of their phone camera.
 Question: "${question}"
 Rules:
+- Report only what is in the walking path ahead; ignore the periphery.
 - Answer the question in 25 words or fewer.
 - Use only what is clearly visible in the image.
 - Use left/ahead/right spatial wording when referring to locations.

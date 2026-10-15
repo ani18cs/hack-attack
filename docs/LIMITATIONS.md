@@ -6,13 +6,20 @@
 ---
 
 ## 1. Perception & Detection Boundaries
-1. **Distance Estimation via 2D Bounding Boxes:**
-   - Single-camera mobile phones lack hardware depth sensors (LiDAR/Time-of-Flight). Distance is geometrically inferred from normalized bounding box dimensions relative to typical real-world physical object scales.
-   - Irregular object poses, occlusions, non-standard sizes, or atypical camera tilt can result in +/- 30% distance variance.
-2. **COCO-SSD 80-Class Vocabulary:**
+1. **Distance Estimation via 2D Bounding Boxes & Ground-Plane Geometry:**
+   - Single-camera mobile phones lack hardware depth sensors (LiDAR/Time-of-Flight). Distance is an estimate (roughly **±30% to ±50%**) geometrically inferred from bounding box height against standard prior heights, and ground-plane ray angles using `deviceorientation` pitch.
+   - Perceived distance depends heavily on phone holding height (chest height vs eye level), phone downward tilt, user posture, and camera focal parameters.
+   - All spoken distances honestly include qualifiers like *"about"*, *"less than"*, or *"more than"*. Never rely on estimated distance for life-critical clearance.
+2. **Stride and Hand-Span Units are Approximations:**
+   - Default stride (0.7m) and hand span (0.19m) lengths—or values derived from user height (`stride ≈ 0.415 * height`, `hand-span ≈ 0.11 * height`)—are population anthropometric rules of thumb.
+   - Individual walking pace, terrain, footwear, and arm geometry cause real variation. Users can calibrate stride length via voice command (*"calibrate my stride"*) or switch to metric (*"use metres"*).
+3. **Walking Path Corridor & Peripheral Hazards:**
+   - To reduce cognitive cognitive load and speech chatter, SightLine prioritizes a forward walking corridor (central 60% of frame, below top 25%).
+   - Side zones only announce imminent collision hazards (objects very close or growing rapidly over consecutive frames). Distant peripheral obstacles outside the walking corridor are intentionally suppressed.
+4. **COCO-SSD 80-Class Vocabulary:**
    - On-device real-time detection uses MobileNetV2-COCO-SSD, which is strictly limited to 80 standard categories (e.g. `person`, `chair`, `bottle`, `backpack`, `car`, `cell phone`).
    - Objects outside this vocabulary (such as low curbs, potholes, glass doors, or stairs) cannot be tracked at 8 FPS on-device and rely on periodic cloud VLM scans.
-3. **Hazard Scan is Best-Effort:**
+5. **Hazard Scan is Best-Effort:**
    - The cloud hazard scan runs every 6 seconds and reports only clearly visible drop-offs, stairs, or open drains.
    - It cannot guarantee detection of transparent glass doors, thin overhead wires, fast-moving cyclists, or sudden moving hazards.
 

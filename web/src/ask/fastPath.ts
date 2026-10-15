@@ -58,6 +58,51 @@ export function matchFastPath(rawTranscript: string, state?: AskState): ToolCall
     };
   }
 
+  // 3. Units and height settings
+  if (transcript === 'use metres' || transcript === 'use meters') {
+    return {
+      tool: 'set_units',
+      args: { preference: 'metres' },
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
+  if (transcript === 'use strides') {
+    return {
+      tool: 'set_units',
+      args: { preference: 'strides' },
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
+  if (
+    transcript === 'calibrate my stride' ||
+    transcript === 'calibrate stride' ||
+    transcript.includes('calibrate stride')
+  ) {
+    return {
+      tool: 'calibrate_stride',
+      args: {},
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
+  const heightMatch = transcript.match(/(?:set\s+(?:my\s+)?height\s+(?:to\s+)?|height\s+is\s+)(\d{2,3})(?:\s*cm)?/i);
+  if (heightMatch && heightMatch[1]) {
+    const heightCm = parseInt(heightMatch[1], 10);
+    if (heightCm >= 90 && heightCm <= 240) {
+      return {
+        tool: 'set_height',
+        args: { heightCm },
+        confidence: 1.0,
+        source: 'local',
+      };
+    }
+  }
+
   // 3. Where am I / location status
   if (
     transcript.includes('where am i') ||

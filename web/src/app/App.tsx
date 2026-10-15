@@ -14,6 +14,7 @@ import { voice } from '../core/voice';
 import type { SceneObject } from '../types';
 import { announcer } from '../vision/announcer';
 import { detector } from '../vision/detector';
+import { FOCUS_CONFIG } from '../vision/focus';
 import { processSpatialObject } from '../vision/spatial';
 
 export const App: React.FC = () => {
@@ -264,6 +265,44 @@ export const App: React.FC = () => {
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the walking path corridor rectangle and zone labels
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const corridorLeft = cw * FOCUS_CONFIG.corridor.xMin;
+    const corridorRight = cw * FOCUS_CONFIG.corridor.xMax;
+    const corridorWidth = corridorRight - corridorLeft;
+    const corridorTop = ch * FOCUS_CONFIG.ignoreTop;
+    const corridorHeight = ch - corridorTop;
+
+    // 1. Upper Ignored Zone
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
+    ctx.fillRect(0, 0, cw, corridorTop);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('Upper Zone (Ignored)', 10, Math.min(20, corridorTop - 6));
+
+    // 2. Side Danger-Only Zones
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.2)';
+    ctx.fillRect(0, corridorTop, corridorLeft, corridorHeight);
+    ctx.fillRect(corridorRight, corridorTop, cw - corridorRight, corridorHeight);
+
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.85)';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('Side Zone (Danger only)', 10, corridorTop + 20);
+    ctx.fillText('Side Zone (Danger only)', Math.max(10, cw - 130), corridorTop + 20);
+
+    // 3. Central Walking Corridor Box
+    ctx.save();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(corridorLeft, corridorTop, corridorWidth, corridorHeight);
+    ctx.restore();
+
+    ctx.fillStyle = '#22c55e';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('Walking Path Corridor', corridorLeft + 8, corridorTop + 18);
 
     const scaleX = canvas.width / videoWidth;
     const scaleY = canvas.height / videoHeight;

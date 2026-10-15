@@ -48,6 +48,26 @@ class CameraController {
       }
     }
 
+    if (this.stream) {
+      try {
+        const videoTrack = this.stream.getVideoTracks()[0];
+        if (videoTrack && typeof (videoTrack as any).getCapabilities === 'function') {
+          const capabilities = (videoTrack as any).getCapabilities();
+          if (capabilities && 'zoom' in capabilities) {
+            const minZoom = capabilities.zoom?.min ?? 1;
+            const maxZoom = capabilities.zoom?.max ?? 1;
+            const targetZoom = Math.max(minZoom, Math.min(1.5, maxZoom));
+            await (videoTrack.applyConstraints as any)({
+              advanced: [{ zoom: targetZoom }],
+            }).catch(() => {});
+          }
+        }
+      } catch (zoomErr) {
+        // Fail safely if unsupported on this browser
+        console.warn('Camera zoom constraint not supported:', zoomErr);
+      }
+    }
+
     if (videoEl) {
       this.videoElement = videoEl;
       this.videoElement.srcObject = this.stream;
@@ -78,34 +98,47 @@ class CameraController {
   }
 
   /**
-   * Captures the current video frame, downscales to max 1024px wide, and returns a JPEG base64 string.
+   * Captures the current video frame, optionally cropped to the walking path corridor,
+   * downscales to maxWidth, and returns a JPEG base64 string.
    */
-  public captureFrame(maxWidth = 720, quality = 0.65): string | null {
+  public captureFrame(maxWidth = 720, quality = 0.65, cropCorridor = false): string | null {
     if (!this.videoElement || this.videoElement.videoWidth === 0) {
       return null;
     }
 
     const video = this.videoElement;
-    let width = video.videoWidth;
-    let height = video.videoHeight;
+    let sx = 0;
+    let sy = 0;
+    let sWidth = video.videoWidth;
+    let sHeight = video.videoHeight;
 
-    if (width > maxWidth) {
-      const scale = maxWidth / width;
-      width = maxWidth;
-      height = Math.round(height * scale);
+    if (cropCorridor) {
+      sx = Math.round(video.videoWidth * 0.2);
+      sy = Math.round(video.videoHeight * 0.25);
+      sWidth = Math.round(video.videoWidth * 0.6);
+      sHeight = Math.round(video.videoHeight * 0.75);
+    }
+
+    let outWidth = sWidth;
+    let outHeight = sHeight;
+
+    if (outWidth > maxWidth) {
+      const scale = maxWidth / outWidth;
+      outWidth = maxWidth;
+      outHeight = Math.round(outHeight * scale);
     }
 
     if (!this.canvas) {
       this.canvas = document.createElement('canvas');
     }
 
-    this.canvas.width = width;
-    this.canvas.height = height;
+    this.canvas.width = outWidth;
+    this.canvas.height = outHeight;
 
     const ctx = this.canvas.getContext('2d');
     if (!ctx) return null;
 
-    ctx.drawImage(video, 0, 0, width, height);
+    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
 
     // Returns data:image/jpeg;base64,...
     return this.canvas.toDataURL('image/jpeg', quality);

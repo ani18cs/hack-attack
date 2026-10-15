@@ -11,15 +11,16 @@ SightLine is an accessible Progressive Web App (PWA) that transforms any standar
 
 | Mode | Capability | Tech / Latency | Audio & Spoken Cue |
 | :--- | :--- | :--- | :--- |
-| **Around Me** | Real-time object awareness in 5 spatial sectors | On-device COCO-SSD (~8 FPS, <80ms) | *"Chair slightly-left, near."* |
-| **Obstacle Alert** | Collision warnings with central corridor & size-growth tracking | On-device COCO-SSD + Haptics | Accelerating proximity beeps + *"Stop. Table ahead, close."* |
+| **Walking Path Focus** | Forward corridor attention (x: 20%-80%), suppresses upper and peripheral chatter | Digital/Hardware zoom crop + Canvas mapping | Focuses strictly on walking path ahead |
+| **Around Me** | Real-time object awareness in walking path using natural strides | Monocular size + Ground-plane tilt (~8 FPS) | *"Chair about 2 strides, ahead."* |
+| **Obstacle Alert** | Collision warnings: under 2 strides in path or rapid approach | Path danger + side danger policy + Haptics | Accelerating beeps + *"Stop. Chair ahead."* |
 | **Read Signs** | Directional OCR fusing printed text and directional arrows | Gemini VLM (Tesseract.js offline) | *"Exit, arrow points right."* |
-| **Find Destination** | Destination finder with HRTF 3D audio beacon | State machine + Web Audio PannerNode | Earcon chime + spatial ping panned to ear |
-| **Venue Navigation** | Turn-by-turn indoor guidance with step & compass dead reckoning | Pre-mapped JSON + Accelerometer | *"Walk about 20 steps. Turn left at corridor."* |
+| **Find Destination** | Destination finder with HRTF 3D audio beacon & stride cue | State machine + Web Audio PannerNode | Earcon chime + *"Washroom spotted ahead, about 3 strides."* |
+| **Venue Navigation** | Turn-by-turn indoor guidance calibrated to user's stride | Pre-mapped JSON + Stride calibration | *"Walk about 20 steps. Turn left at corridor."* |
 | **Currency Reader** | Identifies Indian Rupee banknotes (₹10–₹2000) | Gemini VLM (Zero-guess fallback) | *"Five hundred rupee note."* |
 | **Waste Sorter** | Classifies wet, dry, recyclable, hazardous, e-waste + bin color | Configurable `waste-map.json` | Success chime + *"Plastic bottle. Dry waste, blue bin."* |
 | **Label Reader** | Reads product packaging, allergens first, strictly no guessing | Zero-guess safety rules | *"Allergens: Peanuts. Please verify medicine with a person."* |
-| **Hazard Scan** | Best-effort periodic scan for stairs, drop-offs, and open drains | 6s rate-limited cloud scan | Danger alert + *"Caution: stairs ahead."* |
+| **Hazard Scan** | Best-effort periodic scan for stairs, drop-offs, and open drains | 6s rate-limited cloud scan (corridor-focused) | Danger alert + *"Caution: stairs ahead."* |
 | **Emergency SOS** | Instant GPS coords + visual surroundings context | Geolocation + Visual context | Prefilled WhatsApp / SMS dispatch |
 
 ---

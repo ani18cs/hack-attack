@@ -12,11 +12,19 @@ export type SpeakPriority = 'danger' | 'normal' | 'low';
 
 export type Verbosity = 'quiet' | 'normal' | 'detailed';
 
+export type DetectionZone = 'path' | 'side' | 'upper';
+
+export type UnitPreference = 'strides' | 'metres';
+
 export interface SceneObject {
   label: string;
   score: number;
   direction: Direction;
   distance: DistanceBucket;
+  distanceMeters?: number;
+  formattedDistance?: string;
+  zone?: DetectionZone;
+  areaRatio?: number;
   danger: boolean;
   bbox: [number, number, number, number]; // [x, y, width, height]
 }

@@ -1,5 +1,6 @@
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as tf from '@tensorflow/tfjs';
+import { FOCUS_CONFIG, getCorridorCropRect, mapCroppedBoxToFullFrame } from './focus';
 import { RawDetection } from './spatial';
 
 class DetectorController {
@@ -10,6 +11,8 @@ class DetectorController {
   private lastRunTime = 0;
   private targetFps = 8;
   private animationFrameId: number | null = null;
+  private cropCanvas: HTMLCanvasElement | null = null;
+  private cropCorridor = true;
   private listeners: Set<(detections: RawDetection[]) => void> = new Set();
   private loadListeners: Set<(loaded: boolean) => void> = new Set();
 
@@ -68,11 +71,44 @@ class DetectorController {
     return () => this.listeners.delete(listener);
   }
 
+  public setCropCorridor(enabled: boolean): void {
+    this.cropCorridor = enabled;
+  }
+
   /**
    * One-off detection on a video frame element.
+   * If cropCorridor is enabled and dimensions are valid, crops to the walking corridor canvas,
+   * runs COCO-SSD on the crop, and maps detected bounding boxes back to full-frame coordinates.
    */
-  public async detect(videoElement: HTMLVideoElement): Promise<RawDetection[]> {
+  public async detect(videoElement: HTMLVideoElement, cropCorridor = this.cropCorridor): Promise<RawDetection[]> {
     const model = await this.loadModel();
+    const vw = videoElement.videoWidth;
+    const vh = videoElement.videoHeight;
+
+    if (cropCorridor && vw > 0 && vh > 0 && typeof document !== 'undefined') {
+      if (!this.cropCanvas) {
+        this.cropCanvas = document.createElement('canvas');
+      }
+      const crop = getCorridorCropRect(vw, vh, FOCUS_CONFIG);
+      this.cropCanvas.width = crop.sWidth;
+      this.cropCanvas.height = crop.sHeight;
+      const ctx = this.cropCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, crop.sWidth, crop.sHeight);
+        const predictions = await model.detect(this.cropCanvas);
+        return predictions.map((p) => ({
+          label: p.class,
+          score: p.score,
+          bbox: mapCroppedBoxToFullFrame(
+            p.bbox as [number, number, number, number],
+            vw,
+            vh,
+            FOCUS_CONFIG
+          ),
+        }));
+      }
+    }
+
     const predictions = await model.detect(videoElement);
     return predictions.map((p) => ({
       label: p.class,
@@ -108,14 +144,42 @@ class DetectorController {
 
         if (this.model) {
           try {
-            const predictions = await this.model.detect(v);
-            const validDetections: RawDetection[] = predictions
-              .filter((p) => p.score >= this.minScore)
-              .map((p) => ({
-                label: p.class,
-                score: p.score,
-                bbox: p.bbox as [number, number, number, number],
-              }));
+            let validDetections: RawDetection[] = [];
+
+            if (this.cropCorridor && v.videoWidth > 0 && v.videoHeight > 0 && typeof document !== 'undefined') {
+              if (!this.cropCanvas) {
+                this.cropCanvas = document.createElement('canvas');
+              }
+              const crop = getCorridorCropRect(v.videoWidth, v.videoHeight, FOCUS_CONFIG);
+              this.cropCanvas.width = crop.sWidth;
+              this.cropCanvas.height = crop.sHeight;
+              const ctx = this.cropCanvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(v, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, crop.sWidth, crop.sHeight);
+                const predictions = await this.model.detect(this.cropCanvas);
+                validDetections = predictions
+                  .filter((p) => p.score >= this.minScore)
+                  .map((p) => ({
+                    label: p.class,
+                    score: p.score,
+                    bbox: mapCroppedBoxToFullFrame(
+                      p.bbox as [number, number, number, number],
+                      v.videoWidth,
+                      v.videoHeight,
+                      FOCUS_CONFIG
+                    ),
+                  }));
+              }
+            } else {
+              const predictions = await this.model.detect(v);
+              validDetections = predictions
+                .filter((p) => p.score >= this.minScore)
+                .map((p) => ({
+                  label: p.class,
+                  score: p.score,
+                  bbox: p.bbox as [number, number, number, number],
+                }));
+            }
 
             this.listeners.forEach((fn) => fn(validDetections));
           } catch (e) {

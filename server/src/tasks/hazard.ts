@@ -46,6 +46,7 @@ export const hazardGeminiSchema = {
 export function buildHazardPrompt(req: AnalyzeRequest): string {
   const lang = req.lang || 'en';
   return `You perform a critical safety scan for a blind pedestrian.
+Report only what is in the walking path ahead; ignore the periphery.
 Scan the forward walking path for dangerous physical hazards:
 - Downward stairs or drop-offs
 - Wet or slippery floors

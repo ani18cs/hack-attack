@@ -19,6 +19,7 @@ import { api } from '../vision/api';
 import { detector } from '../vision/detector';
 import { recognizeTextFallback } from '../vision/ocr';
 import { processSpatialObject } from '../vision/spatial';
+import { formatDistanceBucketToStrides } from '../vision/units';
 import { askContext } from './context';
 import type { RouterTool, ToolCall } from './types';
 
@@ -165,6 +166,18 @@ export class ToolRuntime {
         this.handleSetLanguage(args?.lang || 'en');
         break;
 
+      case 'set_units':
+        this.handleSetUnits(args?.preference || 'strides');
+        break;
+
+      case 'set_height':
+        this.handleSetHeight(args?.heightCm || 170);
+        break;
+
+      case 'calibrate_stride':
+        this.handleCalibrateStride(args?.distanceMeters, args?.steps);
+        break;
+
       case 'trigger_sos':
         this.startSosConfirmation();
         break;
@@ -193,18 +206,34 @@ export class ToolRuntime {
     speech.speak('Looking.', { priority: 'normal' });
 
     try {
-      const frame = camera.captureFrame(720, 0.65);
+      const frame = camera.captureFrame(720, 0.65, true);
       if (!frame) {
         speech.speak('Camera not ready. Tap and try again.', { priority: 'normal' });
         return;
       }
 
       const res = await api.describe(frame, speech.getLang());
-      if (res.ok && res.summary) {
-        askContext.setLastAnswer(res.summary);
-        earcons.success();
-        haptics.pulseFound();
-        speech.speak(res.summary, { priority: 'normal' });
+      if (res.ok) {
+        let spokenSummary = res.summary;
+        if (res.data?.items && res.data.items.length > 0) {
+          const unitPref = settings.getSettings().unitPreference;
+          const phrases = res.data.items.slice(0, 3).map((item) => {
+            const stridePhrase = formatDistanceBucketToStrides(item.distance, unitPref);
+            return `${item.label} ${stridePhrase}, ${item.direction.replace('-', ' ')}`;
+          });
+          spokenSummary = phrases.join('. ') + '.';
+        }
+
+        if (spokenSummary) {
+          askContext.setLastAnswer(spokenSummary);
+          earcons.success();
+          haptics.pulseFound();
+          speech.speak(spokenSummary, { priority: 'normal' });
+        } else {
+          const fallback = "I'm not sure. Tap and try again.";
+          askContext.setLastAnswer(fallback);
+          speech.speak(fallback, { priority: 'normal' });
+        }
       } else {
         const fallback = res.summary || "I'm not sure. Tap and try again.";
         askContext.setLastAnswer(fallback);
@@ -404,12 +433,18 @@ export class ToolRuntime {
       try {
         const res = await api.find(frame, fsm.target, speech.getLang());
         if (res.ok && res.data) {
+          const unitPref = settings.getSettings().unitPreference;
+          const distPhrase = formatDistanceBucketToStrides(res.data.distance, unitPref);
+          const cue = res.data.found
+            ? `${fsm.target} spotted ${res.data.direction.replace('-', ' ')}, ${distPhrase}.`
+            : res.data.cue || res.summary;
+
           fsm.handleResult({
             found: res.data.found,
             direction: res.data.direction,
             distance: res.data.distance,
             confidence: res.confidence,
-            cue: res.data.cue || res.summary,
+            cue,
             gender: res.data.gender,
           });
         } else {
@@ -768,6 +803,34 @@ export class ToolRuntime {
     } else {
       speech.speak('English selected.', { priority: 'normal' });
     }
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Tool: set_units                                                            */
+  /* -------------------------------------------------------------------------- */
+  private handleSetUnits(pref: 'strides' | 'metres'): void {
+    settings.setUnitPreference(pref);
+    speech.speak(`Using ${pref === 'metres' ? 'metres' : 'strides'}.`, { priority: 'normal' });
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Tool: set_height                                                           */
+  /* -------------------------------------------------------------------------- */
+  private handleSetHeight(heightCm: number): void {
+    const heightM = heightCm / 100;
+    settings.setUserHeight(heightM);
+    const stride = settings.getSettings().strideMeters;
+    speech.speak(`Height set to ${heightCm} centimetres. Stride is about ${stride} metres.`, {
+      priority: 'normal',
+    });
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Tool: calibrate_stride                                                     */
+  /* -------------------------------------------------------------------------- */
+  private handleCalibrateStride(distanceMeters = 10, steps = 14): void {
+    const calibrated = settings.calibrateStride(distanceMeters, steps);
+    speech.speak(`Stride calibrated to about ${calibrated} metres.`, { priority: 'normal' });
   }
 
   /* -------------------------------------------------------------------------- */

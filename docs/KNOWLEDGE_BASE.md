@@ -82,14 +82,22 @@ Hybrid architecture: local on-device detection for real-time safety + unified Vi
 
 ```
 Phone Browser (PWA, HTTPS)
- ├─ Camera (getUserMedia rear camera, 1024px JPEG)
- ├─ Local detector: TensorFlow.js COCO-SSD (lite_mobilenet_v2) → 5–10 FPS time-gated
- ├─ Spatial engine: box center x → direction ('left' | 'slightly-left' | 'ahead' | 'slightly-right' | 'right')
- │                  area ratio  → distance ('very-close' | 'close' | 'near' | 'far')
- │                  corridor    → danger rule (central 50% + lower path + area growth)
+ ├─ Camera (getUserMedia rear camera, 1280x720, optical/digital zoom crop)
+ ├─ Focus & Corridor Engine (focus.ts):
+ │    ├─ Central Walking Corridor (x: 0.2 to 0.8, y: >= 0.25)
+ │    ├─ Upper Zone (y < 0.25): completely ignored (lights/ceiling)
+ │    ├─ Side Zones (x < 0.2 or > 0.8): danger-only for immediate collision risk
+ │    └─ Walking-relevant allowlist filter (18 COCO classes + minAreaRatio gate)
+ ├─ Local detector: TensorFlow.js COCO-SSD (lite_mobilenet_v2) on corridor crop → mapped to full frame
+ ├─ Spatial & Units Engine (spatial.ts, units.ts):
+ │    ├─ Size-based distance: (CLASS_HEIGHT[label] * focalPx) / boxHeightPx
+ │    ├─ Ground-plane distance: phoneHeight / tan(angleBelowHorizon) using deviceorientation tilt
+ │    ├─ Units: personalized stride (0.7m default) & hand-spans (<0.9m in object finding)
+ │    ├─ Danger threshold: obstacles <= 2 strides in walking path trigger immediate danger
+ │    └─ Natural honest phrasing: "about 2 strides", "less than a stride", "more than 8 strides"
  ├─ 3D Audio Beacon: Web Audio PannerNode (HRTF) + stereo fallback + proximity beeping
  ├─ Speech Out: SpeechSynthesis priority queue with verbosity filtering
- ├─ Voice In: SpeechRecognition continuous listener with fuzzy keyword routing
+ ├─ Voice In: SpeechRecognition continuous listener with fast-path & settings router
  ├─ Haptics: navigator.vibrate patterns (info, danger, found)
  ├─ Offline Fallback: Tesseract.js in browser
  └─ On-Demand Requests (One in-flight per task, abort on mode change)

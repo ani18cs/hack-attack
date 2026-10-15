@@ -1,10 +1,15 @@
-import { Verbosity } from '../types';
+import { UnitPreference, Verbosity } from '../types';
+import { calibrateFromWalk, deriveFromHeight } from '../vision/units';
 
 export interface AppSettings {
   verbosity: Verbosity;
   language: 'en-IN' | 'hi-IN' | 'kn-IN';
   dashboardVisible: boolean;
   trustedContact: string;
+  unitPreference: UnitPreference;
+  strideMeters: number;
+  handSpanMeters: number;
+  userHeightMeters?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -12,6 +17,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'en-IN',
   dashboardVisible: false,
   trustedContact: '+919876543210',
+  unitPreference: 'strides',
+  strideMeters: 0.7,
+  handSpanMeters: 0.19,
 };
 
 const STORAGE_KEY = 'sightline_settings_v1';
@@ -65,6 +73,26 @@ class SettingsManager {
     this.settings.dashboardVisible = forced ?? !this.settings.dashboardVisible;
     this.save();
     return this.settings.dashboardVisible;
+  }
+
+  public setUnitPreference(unitPreference: UnitPreference): void {
+    this.settings.unitPreference = unitPreference;
+    this.save();
+  }
+
+  public setUserHeight(heightMeters: number): void {
+    const derived = deriveFromHeight(heightMeters);
+    this.settings.userHeightMeters = heightMeters;
+    this.settings.strideMeters = derived.strideMeters;
+    this.settings.handSpanMeters = derived.handSpanMeters;
+    this.save();
+  }
+
+  public calibrateStride(knownDistanceMeters: number, stepsCounted: number): number {
+    const calibrated = calibrateFromWalk(knownDistanceMeters, stepsCounted);
+    this.settings.strideMeters = calibrated;
+    this.save();
+    return calibrated;
   }
 
   public updateSettings(partial: Partial<AppSettings>): void {
