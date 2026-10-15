@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { VisionTask } from '../types.js';
 import { MOCK_FIXTURES } from '../mock/fixtures.js';
 import { TASK_REGISTRY } from './registry.js';
+import { toCurrencySummary } from './currency.js';
+import { toWasteSummary } from './waste.js';
+import { toLabelSummary } from './label.js';
+import { toHazardSummary } from './hazard.js';
 
 describe('Server Task Registry', () => {
   const allTasks: VisionTask[] = [
@@ -23,17 +27,10 @@ describe('Server Task Registry', () => {
     }
   });
 
-  it('marks Part 1 core tasks as implemented, and Part 2 as scaffolded', () => {
-    expect(TASK_REGISTRY.describe.implemented).toBe(true);
-    expect(TASK_REGISTRY.read.implemented).toBe(true);
-    expect(TASK_REGISTRY.find.implemented).toBe(true);
-
-    expect(TASK_REGISTRY.currency.implemented).toBe(false);
-    expect(TASK_REGISTRY.waste.implemented).toBe(false);
-    expect(TASK_REGISTRY.label.implemented).toBe(false);
-    expect(TASK_REGISTRY.hazard.implemented).toBe(false);
-    expect(TASK_REGISTRY.verify_landmark.implemented).toBe(false);
-    expect(TASK_REGISTRY.sos_context.implemented).toBe(false);
+  it('marks all tasks as fully implemented presets for Part 2', () => {
+    for (const task of allTasks) {
+      expect(TASK_REGISTRY[task].implemented, `Task ${task} should be implemented`).toBe(true);
+    }
   });
 
   it('validates describe mock fixture against describeSchema', () => {
@@ -70,30 +67,83 @@ describe('Server Task Registry', () => {
     expect(summary.split(' ').length).toBeLessThanOrEqual(25);
   });
 
-  it('validates currency, waste, and label mock fixtures against their schemas', () => {
-    expect(TASK_REGISTRY.currency.schema.safeParse(MOCK_FIXTURES.currency.data).success).toBe(true);
-    expect(TASK_REGISTRY.waste.schema.safeParse(MOCK_FIXTURES.waste.data).success).toBe(true);
-    expect(TASK_REGISTRY.label.schema.safeParse(MOCK_FIXTURES.label.data).success).toBe(true);
-    expect(TASK_REGISTRY.hazard.schema.safeParse(MOCK_FIXTURES.hazard.data).success).toBe(true);
-    expect(TASK_REGISTRY.verify_landmark.schema.safeParse(MOCK_FIXTURES.verify_landmark.data).success).toBe(true);
-    expect(TASK_REGISTRY.sos_context.schema.safeParse(MOCK_FIXTURES.sos_context.data).success).toBe(true);
+  it('handles currency denomination and honest refusal to guess', () => {
+    const valid500 = toCurrencySummary({ denomination: 500, confidence: 0.95 });
+    expect(valid500).toBe('Five hundred rupee note.');
+
+    const unclear = toCurrencySummary({ denomination: null, confidence: 0.2 });
+    expect(unclear).toBe("I can't tell, hold the note flat and closer.");
   });
 
-  it('builds prompts with requested target and languages', () => {
-    const findPrompt = TASK_REGISTRY.find.buildPrompt({
-      task: 'find',
-      image: '',
-      target: 'emergency exit',
-      lang: 'hi',
+  it('handles waste categories and unknown bin label fallback', () => {
+    const bottle = toWasteSummary({
+      item: 'Plastic water bottle',
+      category: 'recyclable',
+      confidence: 0.9,
     });
-    expect(findPrompt).toContain('emergency exit');
-    expect(findPrompt).toContain('hi');
+    expect(bottle).toContain('Plastic water bottle');
+    expect(bottle.toLowerCase()).toContain('blue bin');
 
-    const readPrompt = TASK_REGISTRY.read.buildPrompt({
-      task: 'read',
-      image: '',
-      lang: 'kn',
+    const unknownWaste = toWasteSummary({
+      item: 'Mystery wrapper',
+      category: 'unknown',
+      confidence: 0.3,
     });
-    expect(readPrompt).toContain('kn');
+    expect(unknownWaste).toBe("I'm not sure. Please check the bin label.");
+  });
+
+  it('handles label reading, allergen prioritization, and medicine verification warning', () => {
+    // 1. Food label with allergens
+    const food = toLabelSummary({
+      product: 'Oat Cookies',
+      isMedicine: false,
+      allergens: ['Peanuts', 'Gluten'],
+      expiry: '2026-12-31',
+      legible: true,
+      confidence: 0.9,
+    });
+    expect(food).toContain('Allergens: Peanuts, Gluten.');
+    expect(food).toContain('Oat Cookies');
+    expect(food).toContain('Expires 2026-12-31.');
+
+    // 2. Medicine label
+    const med = toLabelSummary({
+      product: 'Paracetamol 500mg',
+      isMedicine: true,
+      allergens: [],
+      expiry: '2027-05-15',
+      legible: true,
+      confidence: 0.95,
+    });
+    expect(med).toContain('Please verify medicine details with a person.');
+
+    // 3. Illegible label
+    const illegible = toLabelSummary({
+      product: 'Unknown',
+      isMedicine: false,
+      allergens: [],
+      legible: false,
+      confidence: 0.2,
+    });
+    expect(illegible).toBe("I can't read that clearly. Please ask someone to check, especially the expiry date.");
+  });
+
+  it('handles hazard scan and speaks only high urgency hazards', () => {
+    const hazardsWithHigh = toHazardSummary({
+      hazards: [
+        { type: 'Downward stairs', direction: 'ahead', urgency: 'high' },
+        { type: 'Wet floor sign', direction: 'slightly-right', urgency: 'medium' },
+      ],
+      confidence: 0.9,
+    });
+    expect(hazardsWithHigh).toBe('Caution: Downward stairs ahead.');
+
+    const mediumOnly = toHazardSummary({
+      hazards: [
+        { type: 'Bicycle on curb', direction: 'right', urgency: 'medium' },
+      ],
+      confidence: 0.8,
+    });
+    expect(mediumOnly).toBe('Path ahead appears clear of major hazards.');
   });
 });

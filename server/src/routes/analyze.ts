@@ -24,6 +24,21 @@ const analyzeLimiter = rateLimit({
   },
 });
 
+export const ALLOWED_TASKS: VisionTask[] = [
+  'describe',
+  'read',
+  'find',
+  'currency',
+  'waste',
+  'label',
+  'hazard',
+  'verify_landmark',
+  'sos_context',
+];
+
+// Per-task rate limit store: hazard max 1 request per 6s per client
+const hazardRateLimitMap = new Map<string, number>();
+
 const analyzeRequestSchema = z.object({
   task: z.enum([
     'describe',
@@ -62,6 +77,40 @@ analyzeRouter.post('/analyze', analyzeLimiter, async (req: Request, res: Respons
   }
 
   const { task, image, lang, target, context } = parseResult.data;
+
+  // Guard against unallowed tasks
+  if (!ALLOWED_TASKS.includes(task as VisionTask)) {
+    res.status(400).json({
+      task: task as VisionTask,
+      ok: false,
+      summary: 'Task not allowed.',
+      confidence: 0,
+      data: null,
+      error: `Task "${task}" is not in ALLOWED_TASKS.`,
+      latencyMs: Date.now() - startTime,
+    } satisfies AnalyzeResponse);
+    return;
+  }
+
+  // Per-task rate limiting for hazard scan (max 1 per 6s per client IP)
+  if (task === 'hazard') {
+    const clientIp = req.ip || req.socket.remoteAddress || 'local';
+    const lastTime = hazardRateLimitMap.get(clientIp) || 0;
+    const now = Date.now();
+    if (now - lastTime < 6000) {
+      res.status(429).json({
+        task: 'hazard',
+        ok: false,
+        summary: 'Hazard scan running too frequently. Please wait a few seconds.',
+        confidence: 0,
+        data: null,
+        error: 'Rate limit: hazard scan allows max 1 request per 6 seconds per client.',
+        latencyMs: now - startTime,
+      } satisfies AnalyzeResponse);
+      return;
+    }
+    hazardRateLimitMap.set(clientIp, now);
+  }
 
   // 2. MOCK_VLM offline development / demo mode
   const isMock = process.env.MOCK_VLM === 'true';
