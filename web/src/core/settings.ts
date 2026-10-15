@@ -65,6 +65,11 @@ class SettingsManager {
     return this.settings.dashboardVisible;
   }
 
+  public updateSettings(partial: Partial<AppSettings>): void {
+    this.settings = { ...this.settings, ...partial };
+    this.save();
+  }
+
   public subscribe(listener: (settings: AppSettings) => void): () => void {
     this.listeners.add(listener);
     listener(this.getSettings());

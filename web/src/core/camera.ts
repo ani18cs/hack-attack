@@ -1,3 +1,5 @@
+import { speech } from './speech';
+
 /**
  * Camera stream management and frame capture utility.
  */
@@ -37,7 +39,13 @@ class CameraController {
     } catch (err) {
       // Fallback without specific facingMode if back camera is not directly available
       console.warn('Fallback to basic video constraint:', err);
-      this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } catch (finalErr: any) {
+        console.error('Camera permission denied or camera unavailable:', finalErr);
+        speech.speak('Camera permission denied or camera unavailable.', { priority: 'danger' });
+        throw finalErr;
+      }
     }
 
     if (videoEl) {
@@ -112,6 +120,11 @@ class CameraController {
       this.videoElement.srcObject = null;
       this.videoElement = null;
     }
+  }
+
+  public async restart(videoEl?: HTMLVideoElement): Promise<MediaStream> {
+    this.stop();
+    return this.start(videoEl || this.videoElement || undefined);
   }
 }
 

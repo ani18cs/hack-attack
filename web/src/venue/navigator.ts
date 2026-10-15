@@ -1,4 +1,4 @@
-import { VenueLandmark, VenuePack } from './types';
+import { VenuePack } from './types';
 
 export interface RouteStep {
   instruction: string;

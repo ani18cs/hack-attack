@@ -1,3 +1,4 @@
+import { SpeakPriority } from '../types';
 import { settings } from './settings';
 
 export interface SpeakOptions {
