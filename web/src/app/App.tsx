@@ -10,6 +10,7 @@ import { haptics } from '../core/haptics';
 import { networkMonitor } from '../core/network';
 import { settings } from '../core/settings';
 import { speech } from '../core/speech';
+import { speechPolicy } from '../core/speechPolicy';
 import { voice } from '../core/voice';
 import type { SceneObject } from '../types';
 import { announcer } from '../vision/announcer';
@@ -45,11 +46,12 @@ export const App: React.FC = () => {
   const isSpeakingRef = useRef(false);
   const lastDangerAlertTime = useRef(0);
 
-  // Sync refs for event handlers without re-creating listeners
+  // Sync refs and speechPolicy guards for event handlers
   useEffect(() => {
     isListeningRef.current = isListening;
     isThinkingRef.current = isThinking;
     isSpeakingRef.current = isSpeaking;
+    speechPolicy.setUserListening(isListening);
   }, [isListening, isThinking, isSpeaking]);
 
   // Subscribe to speech, runtime, and network

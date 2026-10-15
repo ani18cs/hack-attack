@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { announcer } from './announcer';
 import { speech } from '../core/speech';
 import { haptics } from '../core/haptics';
+import { settings } from '../core/settings';
 import { SceneObject } from '../types';
 
 vi.mock('../core/speech', () => ({
@@ -92,7 +93,9 @@ describe('SpatialAnnouncer with Zone Policies and Relevance Filter', () => {
     expect(speech.speak).toHaveBeenCalledWith('person close, right.', { priority: 'danger' });
   });
 
-  it('announces path zone candidates using natural distance phrasing', () => {
+  it('announces path zone candidates in detailed verbosity using natural distance phrasing', () => {
+    settings.updateSettings({ verbosity: 'detailed' });
+
     const pathObj: SceneObject = {
       label: 'chair',
       score: 0.9,
@@ -107,5 +110,28 @@ describe('SpatialAnnouncer with Zone Policies and Relevance Filter', () => {
 
     announcer.process([pathObj]);
     expect(speech.speak).toHaveBeenCalledWith('chair about 2 strides, ahead.', { priority: 'normal' });
+
+    // Reset back to normal
+    settings.updateSettings({ verbosity: 'normal' });
+  });
+
+  it('suppresses continuous path announcements in default normal verbosity', () => {
+    settings.updateSettings({ verbosity: 'normal' });
+    vi.mocked(speech.speak).mockClear();
+
+    const pathObj: SceneObject = {
+      label: 'chair',
+      score: 0.9,
+      direction: 'ahead',
+      distance: 'close',
+      formattedDistance: 'about 2 strides',
+      zone: 'path',
+      areaRatio: 0.12,
+      danger: false,
+      bbox: [400, 350, 200, 300],
+    };
+
+    announcer.process([pathObj]);
+    expect(speech.speak).not.toHaveBeenCalled();
   });
 });

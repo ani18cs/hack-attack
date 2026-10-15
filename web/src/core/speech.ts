@@ -1,11 +1,17 @@
 import { SpeakPriority } from '../types';
 import { settings } from './settings';
+import { GUIDANCE } from '../config/guidance';
+import { speechPolicy, type SpeechCategory } from './speechPolicy';
 
 export interface SpeakOptions {
   priority?: SpeakPriority;
   lang?: string;
   rate?: number;
   pitch?: number;
+  category?: SpeechCategory;
+  key?: string;
+  isTransition?: boolean;
+  bypassPolicy?: boolean;
   onEnd?: () => void;
 }
 
@@ -38,7 +44,7 @@ class SpeechController {
   private speaking = false;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private defaultLang = 'en-IN';
-  private defaultRate = 1.0;
+  private defaultRate = GUIDANCE.speech.defaultRate; // 0.85 default (slower voice)
   private maxQueueSize = 3;
   private isPausedForEarcon = false;
   private listeners: Set<(isSpeaking: boolean) => void> = new Set();
@@ -46,12 +52,28 @@ class SpeechController {
   private warnedMissingVoiceLocales = new Set<string>();
 
   constructor() {
+    // Load persisted rate from settings if available
+    try {
+      const savedRate = settings.getSettings().speechRate;
+      if (typeof savedRate === 'number' && !isNaN(savedRate)) {
+        this.defaultRate = this.clampRate(savedRate);
+      }
+    } catch {
+      this.defaultRate = GUIDANCE.speech.defaultRate;
+    }
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       this.loadVoices();
       window.speechSynthesis.onvoiceschanged = () => {
         this.loadVoices();
       };
     }
+  }
+
+  private clampRate(rate: number): number {
+    const min = GUIDANCE.speech.minRate; // 0.6
+    const max = GUIDANCE.speech.maxRate; // 1.2
+    return Math.max(min, Math.min(max, Math.round(rate * 100) / 100));
   }
 
   private loadVoices(): void {
@@ -73,8 +95,36 @@ class SpeechController {
     return this.speaking || this.currentUtterance !== null;
   }
 
-  public setRate(rate: number): void {
-    this.defaultRate = Math.max(0.5, Math.min(2.0, rate));
+  public getRate(): number {
+    return this.defaultRate;
+  }
+
+  public setRate(rate: number): number {
+    const clamped = this.clampRate(rate);
+    this.defaultRate = clamped;
+    settings.updateSettings({ speechRate: clamped });
+    return this.defaultRate;
+  }
+
+  /**
+   * Voice command: decrease speech rate by 0.1
+   */
+  public slower(): number {
+    return this.setRate(this.defaultRate - 0.1);
+  }
+
+  /**
+   * Voice command: increase speech rate by 0.1
+   */
+  public faster(): number {
+    return this.setRate(this.defaultRate + 0.1);
+  }
+
+  /**
+   * Voice command: reset to normal speech rate (0.85)
+   */
+  public normalSpeed(): number {
+    return this.setRate(GUIDANCE.speech.defaultRate);
   }
 
   public setLang(lang: string): void {
@@ -140,18 +190,51 @@ class SpeechController {
     return confidencePhrase(confidence, text);
   }
 
+  /**
+   * Adds natural measured pauses between clauses (inserting commas or micro-pauses).
+   */
+  private formatClausePauses(text: string): string {
+    // If text has multiple clauses like "Stop. Table ahead. Step right",
+    // punctuation like ". " or "; " gives Web Speech API natural breathing room.
+    // Replace abrupt transitions with clean comma/period boundaries.
+    return text
+      .replace(/\s*([.;:])\s*/g, '$1 ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   public speak(text: string, options: SpeakOptions = {}): void {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.warn('SpeechSynthesis not available');
       return;
     }
 
-    const priority = options.priority || 'normal';
+    if (!text || !text.trim()) return;
 
-    // Respect Verbosity: quiet speaks hazards only
-    if (settings.getSettings().verbosity === 'quiet' && priority !== 'danger') {
-      return;
+    // Apply central SpeechPolicy rules (gap, cooldown, verbosity, user listening)
+    if (!options.bypassPolicy) {
+      const allowed = speechPolicy.canSpeak({
+        text,
+        key: options.key,
+        priority: options.priority,
+        category: options.category,
+        isTransition: options.isTransition,
+      });
+
+      if (!allowed) {
+        return;
+      }
+
+      speechPolicy.recordSpoken({
+        text,
+        key: options.key,
+        priority: options.priority,
+        category: options.category,
+        isTransition: options.isTransition,
+      });
     }
+
+    const priority = options.priority || 'normal';
 
     if (priority === 'danger') {
       // Danger immediately interrupts and cancels everything
@@ -185,17 +268,27 @@ class SpeechController {
 
   private executeUtterance(item: QueuedItem): void {
     const { text, options } = item;
-    const utterance = new SpeechSynthesisUtterance(text);
+    const formattedText = this.formatClausePauses(text);
+    const utterance = new SpeechSynthesisUtterance(formattedText);
     const targetLang = options.lang || this.defaultLang;
     utterance.lang = targetLang;
-    utterance.rate = options.rate || this.defaultRate;
+
+    // Rate: urgent messages use urgentRate (0.95), otherwise defaultRate (0.85) or options.rate
+    if (options.priority === 'danger') {
+      utterance.rate = options.rate || GUIDANCE.speech.urgentRate;
+    } else {
+      utterance.rate = options.rate ? this.clampRate(options.rate) : this.defaultRate;
+    }
+
     utterance.pitch = options.pitch || 1.0;
 
     // Pick best matching installed voice if available
     if (this.voices.length > 0) {
       const prefix = targetLang.slice(0, 2).toLowerCase();
       const matched = this.voices.find(
-        (v) => v.lang.toLowerCase().startsWith(prefix) || v.lang.toLowerCase().replace('_', '-').startsWith(prefix)
+        (v) =>
+          v.lang.toLowerCase().startsWith(prefix) ||
+          v.lang.toLowerCase().replace('_', '-').startsWith(prefix)
       );
       if (matched) {
         utterance.voice = matched;
@@ -217,10 +310,12 @@ class SpeechController {
           console.error(e);
         }
       }
-      // Process next queued utterance
+      // Process next queued utterance with ~150ms natural gap between utterances
       if (this.queue.length > 0) {
         const next = this.queue.shift()!;
-        this.executeUtterance(next);
+        setTimeout(() => {
+          this.executeUtterance(next);
+        }, 150);
       }
     };
 

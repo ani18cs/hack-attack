@@ -61,9 +61,10 @@ export class SpatialAnnouncer {
       }
     }
 
-    // Respect verbosity: quiet suppresses non-danger announcements
+    // Navigation-First: Remove continuous "object, direction, distance" announcements from the default path.
+    // The object list is only spoken when the user asks ("what's around me") or in Detailed verbosity.
     const verbosity = settings.getSettings().verbosity;
-    if (verbosity === 'quiet') return;
+    if (verbosity !== 'detailed') return;
 
     // 4. Zone Policy - Normal Announcements
     // Only objects in the path zone are announced for normal situational awareness. Side zones only announce danger.

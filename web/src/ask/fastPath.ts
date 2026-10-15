@@ -58,6 +58,51 @@ export function matchFastPath(rawTranscript: string, state?: AskState): ToolCall
     };
   }
 
+  // 2b. Speech speed controls
+  if (
+    transcript === 'speak slower' ||
+    transcript === 'talk slower' ||
+    transcript === 'slower' ||
+    transcript === 'slower voice' ||
+    transcript === 'slower speed'
+  ) {
+    return {
+      tool: 'set_speech_rate',
+      args: { action: 'slower' },
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
+  if (
+    transcript === 'speak faster' ||
+    transcript === 'talk faster' ||
+    transcript === 'faster' ||
+    transcript === 'faster voice' ||
+    transcript === 'faster speed'
+  ) {
+    return {
+      tool: 'set_speech_rate',
+      args: { action: 'faster' },
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
+  if (
+    transcript === 'normal speed' ||
+    transcript === 'normal voice' ||
+    transcript === 'default speed' ||
+    transcript === 'normal speech'
+  ) {
+    return {
+      tool: 'set_speech_rate',
+      args: { action: 'normal' },
+      confidence: 1.0,
+      source: 'local',
+    };
+  }
+
   // 3. Units and height settings
   if (transcript === 'use metres' || transcript === 'use meters') {
     return {

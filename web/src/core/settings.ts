@@ -10,6 +10,7 @@ export interface AppSettings {
   strideMeters: number;
   handSpanMeters: number;
   userHeightMeters?: number;
+  speechRate?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   unitPreference: 'strides',
   strideMeters: 0.7,
   handSpanMeters: 0.19,
+  speechRate: 0.85,
 };
 
 const STORAGE_KEY = 'andhadhun_settings_v1';

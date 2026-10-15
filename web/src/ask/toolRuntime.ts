@@ -3,6 +3,7 @@ import { haptics } from '../core/haptics';
 import { settings } from '../core/settings';
 import { spatialAudio } from '../core/spatialAudio';
 import { speech } from '../core/speech';
+import { speechPolicy } from '../core/speechPolicy';
 import { camera } from '../core/camera';
 import { FindStateMachine } from '../modes/findStateMachine';
 import type {
@@ -97,13 +98,15 @@ export class ToolRuntime {
   public async execute(call: ToolCall): Promise<void> {
     const { tool, args, speechPrefix } = call;
 
-    // 1. Speak short prefix if provided (e.g. from router)
-    if (speechPrefix && speechPrefix.trim().length > 0) {
-      speech.speak(speechPrefix, { priority: 'normal' });
-    }
+    speechPolicy.setToolAnswering(true);
+    try {
+      // 1. Speak short prefix if provided (e.g. from router)
+      if (speechPrefix && speechPrefix.trim().length > 0) {
+        speech.speak(speechPrefix, { priority: 'normal', category: 'tool_answer' });
+      }
 
-    // 2. Dispatch to specific tool implementation
-    switch (tool) {
+      // 2. Dispatch to specific tool implementation
+      switch (tool) {
       case 'describe_scene':
         await this.runDescribeScene();
         break;
@@ -178,6 +181,10 @@ export class ToolRuntime {
         this.handleCalibrateStride(args?.distanceMeters, args?.steps);
         break;
 
+      case 'set_speech_rate':
+        this.handleSetSpeechRate(args?.action || 'normal');
+        break;
+
       case 'trigger_sos':
         this.startSosConfirmation();
         break;
@@ -193,6 +200,9 @@ export class ToolRuntime {
       default:
         console.warn(`[ToolRuntime] Unrecognized tool: ${tool}`);
         break;
+      }
+    } finally {
+      speechPolicy.setToolAnswering(false);
     }
   }
 
@@ -831,6 +841,24 @@ export class ToolRuntime {
   private handleCalibrateStride(distanceMeters = 10, steps = 14): void {
     const calibrated = settings.calibrateStride(distanceMeters, steps);
     speech.speak(`Stride calibrated to about ${calibrated} metres.`, { priority: 'normal' });
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Tool: set_speech_rate                                                      */
+  /* -------------------------------------------------------------------------- */
+  private handleSetSpeechRate(action: 'slower' | 'faster' | 'normal'): void {
+    let msg = '';
+    if (action === 'slower') {
+      const newRate = speech.slower();
+      msg = `Speaking slower, rate ${newRate.toFixed(1)}.`;
+    } else if (action === 'faster') {
+      const newRate = speech.faster();
+      msg = `Speaking faster, rate ${newRate.toFixed(1)}.`;
+    } else {
+      const newRate = speech.normalSpeed();
+      msg = `Normal speech speed, rate ${newRate.toFixed(1)}.`;
+    }
+    speech.speak(msg, { priority: 'normal', category: 'system' });
   }
 
   /* -------------------------------------------------------------------------- */

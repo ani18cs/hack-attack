@@ -18,6 +18,7 @@ export const ROUTER_TOOLS = [
   'set_units',
   'set_height',
   'calibrate_stride',
+  'set_speech_rate',
   'trigger_sos',
   'help',
   'clarify',
