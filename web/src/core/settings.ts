@@ -4,12 +4,14 @@ export interface AppSettings {
   verbosity: Verbosity;
   language: 'en-IN' | 'hi-IN' | 'kn-IN';
   dashboardVisible: boolean;
+  trustedContact: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   verbosity: 'normal',
   language: 'en-IN',
   dashboardVisible: false,
+  trustedContact: '+919876543210',
 };
 
 const STORAGE_KEY = 'sightline_settings_v1';
