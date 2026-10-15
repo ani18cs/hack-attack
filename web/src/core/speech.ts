@@ -14,6 +14,25 @@ interface QueuedItem {
   options: SpeakOptions;
 }
 
+/**
+ * Confidence-aware speech helper used by all modes:
+ * high (>= 0.6): plain text
+ * medium (0.35 - 0.6): "I think ..."
+ * low (< 0.35): "I'm not sure, but ..."
+ */
+export function confidencePhrase(confidence: number, text: string): string {
+  if (!text) return '';
+  const trimmed = text.trim();
+  if (confidence >= 0.6) {
+    return trimmed;
+  }
+  const lowerFirst = trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+  if (confidence >= 0.35) {
+    return `I think ${lowerFirst}`;
+  }
+  return `I'm not sure, but ${lowerFirst}`;
+}
+
 class SpeechController {
   private queue: QueuedItem[] = [];
   private speaking = false;
@@ -21,14 +40,23 @@ class SpeechController {
   private defaultLang = 'en-IN';
   private defaultRate = 1.0;
   private maxQueueSize = 3;
+  private isPausedForEarcon = false;
   private listeners: Set<(isSpeaking: boolean) => void> = new Set();
+  private voices: SpeechSynthesisVoice[] = [];
+  private warnedMissingVoiceLocales = new Set<string>();
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      this.loadVoices();
       window.speechSynthesis.onvoiceschanged = () => {
-        // Voices loaded
+        this.loadVoices();
       };
     }
+  }
+
+  private loadVoices(): void {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    this.voices = window.speechSynthesis.getVoices();
   }
 
   public subscribe(listener: (isSpeaking: boolean) => void): () => void {
@@ -51,6 +79,52 @@ class SpeechController {
 
   public setLang(lang: string): void {
     this.defaultLang = lang;
+    this.checkVoiceAvailability(lang);
+  }
+
+  public getLang(): string {
+    return this.defaultLang;
+  }
+
+  private checkVoiceAvailability(lang: string): void {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (lang.startsWith('en')) return;
+
+    if (this.voices.length === 0) {
+      this.loadVoices();
+    }
+
+    const prefix = lang.slice(0, 2).toLowerCase();
+    const hasVoice = this.voices.some((v) => v.lang.toLowerCase().startsWith(prefix));
+
+    if (!hasVoice && !this.warnedMissingVoiceLocales.has(prefix)) {
+      this.warnedMissingVoiceLocales.add(prefix);
+      const langName = prefix === 'hi' ? 'Hindi' : prefix === 'kn' ? 'Kannada' : prefix;
+      setTimeout(() => {
+        this.speak(`${langName} voice is not installed on this device. Using English voice.`, {
+          priority: 'normal',
+          lang: 'en-IN',
+        });
+      }, 500);
+    }
+  }
+
+  /**
+   * Pause speech queue briefly so earcon sound cues never overlap spoken words.
+   */
+  public pauseFor(durationMs = 300): void {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    this.isPausedForEarcon = true;
+    try {
+      window.speechSynthesis.pause();
+    } catch {}
+
+    setTimeout(() => {
+      this.isPausedForEarcon = false;
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }, durationMs);
   }
 
   public stop(): void {
@@ -60,6 +134,10 @@ class SpeechController {
     this.speaking = false;
     this.currentUtterance = null;
     this.notify();
+  }
+
+  public withConfidence(text: string, confidence: number): string {
+    return confidencePhrase(confidence, text);
   }
 
   public speak(text: string, options: SpeakOptions = {}): void {
@@ -76,7 +154,7 @@ class SpeechController {
     }
 
     if (priority === 'danger') {
-      // Danger immediately interrupts everything
+      // Danger immediately interrupts and cancels everything
       window.speechSynthesis.cancel();
       this.queue = [];
       this.speaking = false;
@@ -87,7 +165,7 @@ class SpeechController {
 
     if (priority === 'low') {
       // Low priority speaks only if idle and queue is empty
-      if (this.speaking || this.queue.length > 0) {
+      if (this.speaking || this.queue.length > 0 || this.isPausedForEarcon) {
         return;
       }
       this.executeUtterance({ text, options });
@@ -108,9 +186,21 @@ class SpeechController {
   private executeUtterance(item: QueuedItem): void {
     const { text, options } = item;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = options.lang || this.defaultLang;
+    const targetLang = options.lang || this.defaultLang;
+    utterance.lang = targetLang;
     utterance.rate = options.rate || this.defaultRate;
     utterance.pitch = options.pitch || 1.0;
+
+    // Pick best matching installed voice if available
+    if (this.voices.length > 0) {
+      const prefix = targetLang.slice(0, 2).toLowerCase();
+      const matched = this.voices.find(
+        (v) => v.lang.toLowerCase().startsWith(prefix) || v.lang.toLowerCase().replace('_', '-').startsWith(prefix)
+      );
+      if (matched) {
+        utterance.voice = matched;
+      }
+    }
 
     this.currentUtterance = utterance;
     this.speaking = true;
@@ -145,7 +235,6 @@ class SpeechController {
       }
     };
 
-    // Ensure audio unlocking
     try {
       window.speechSynthesis.speak(utterance);
     } catch (err) {

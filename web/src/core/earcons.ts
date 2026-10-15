@@ -1,3 +1,5 @@
+import { speech } from './speech';
+
 /**
  * Synthesizes earcon audio cues using the Web Audio API without any external asset files.
  */
@@ -23,6 +25,7 @@ class EarconController {
    * Urgent hazard alert cue (dual dissonant tone).
    */
   public hazard(): void {
+    speech.pauseFor(350);
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -55,6 +58,7 @@ class EarconController {
    * Positive target found chime (major upward triad).
    */
   public found(): void {
+    speech.pauseFor(350);
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -82,6 +86,7 @@ class EarconController {
    * Success action confirmation.
    */
   public success(): void {
+    speech.pauseFor(300);
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -106,6 +111,7 @@ class EarconController {
    * Error or failure cue (low descending buzz).
    */
   public error(): void {
+    speech.pauseFor(350);
     const ctx = this.getContext();
     if (!ctx) return;
 

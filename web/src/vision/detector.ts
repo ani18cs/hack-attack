@@ -69,6 +69,19 @@ class DetectorController {
   }
 
   /**
+   * One-off detection on a video frame element.
+   */
+  public async detect(videoElement: HTMLVideoElement): Promise<RawDetection[]> {
+    const model = await this.loadModel();
+    const predictions = await model.detect(videoElement);
+    return predictions.map((p) => ({
+      label: p.class,
+      score: p.score,
+      bbox: p.bbox as [number, number, number, number],
+    }));
+  }
+
+  /**
    * Starts real-time detection on the provided video element.
    */
   public startDetection(videoElement: HTMLVideoElement): void {
