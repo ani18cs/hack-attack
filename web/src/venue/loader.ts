@@ -12,10 +12,11 @@ export async function loadVenuePack(venueId = 'amc-hackattack'): Promise<VenuePa
   }
 
   // Check localStorage offline cache
-  const storageKey = `sightline_venue_${venueId}`;
+  const storageKey = `andhadhun_venue_${venueId}`;
+  const legacyKey = `sightline_venue_${venueId}`;
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = localStorage.getItem(storageKey) || localStorage.getItem(legacyKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         const result = VenuePackSchema.safeParse(parsed);

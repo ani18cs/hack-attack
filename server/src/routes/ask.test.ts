@@ -20,7 +20,7 @@ describe('Server Ask Router & Task Suite', () => {
         },
         history: [
           { role: 'user', text: 'Hello' },
-          { role: 'assistant', text: 'SightLine ready.' },
+          { role: 'assistant', text: 'AndhaDhun ready.' },
         ],
       };
 

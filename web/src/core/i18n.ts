@@ -20,7 +20,7 @@ export interface PhraseTable {
 
 export const PHRASES: Record<SupportedLocale, PhraseTable> = {
   'en-IN': {
-    welcome: 'Welcome to SightLine. Your eyes-free sensory assistant is active.',
+    welcome: 'Welcome to AndhaDhun. Your eyes-free sensory assistant is active.',
     commandHelp: 'Available commands: Around me, Read, Find, Currency, Waste, Label, Hazard, Navigate, or Stop.',
     looking: 'Looking...',
     dangerAhead: (label: string) => `Stop. ${label} ahead.`,
@@ -37,7 +37,7 @@ export const PHRASES: Record<SupportedLocale, PhraseTable> = {
     notBuiltYet: 'This mode is not built yet.',
   },
   'hi-IN': {
-    welcome: 'साइटलाइन में आपका स्वागत है। आपका सहायक सक्रिय है।',
+    welcome: 'अंधाधुन में आपका स्वागत है। आपका सहायक सक्रिय है।',
     commandHelp: 'उपलब्ध आदेश: आसपास, पढ़ें, खोजें, नोट पहचानें, कचरा सॉर्ट, लेबल, या रुकें।',
     looking: 'देख रहे हैं...',
     dangerAhead: (label: string) => `रुकें। आगे ${label} है।`,
@@ -54,7 +54,7 @@ export const PHRASES: Record<SupportedLocale, PhraseTable> = {
     notBuiltYet: 'यह मोड अभी तैयार नहीं है।',
   },
   'kn-IN': {
-    welcome: 'ಸೈಟ್‌ಲೈನ್‌ಗೆ ಸುಸ್ವಾಗತ. ನಿಮ್ಮ ಸಹಾಯಕ ಸಕ್ರಿಯವಾಗಿದೆ.',
+    welcome: 'ಅಂಧಾಧುನ್‌ಗೆ ಸುಸ್ವಾಗತ. ನಿಮ್ಮ ಸಹಾಯಕ ಸಕ್ರಿಯವಾಗಿದೆ.',
     commandHelp: 'ಆದೇಶಗಳು: ಸುತ್ತಲೂ, ಓದಿ, ಹುಡುಕಿ, ನೋಟು ಗುರುತಿಸಿ, ಕಸ ವಿಂಗಡಣೆ, ಅಥವಾ ನಿಲ್ಲಿಸಿ.',
     looking: 'ನೋಡಲಾಗುತ್ತಿದೆ...',
     dangerAhead: (label: string) => `ನಿಲ್ಲಿಸಿ. ಮುಂದೆ ${label} ಇದೆ.`,

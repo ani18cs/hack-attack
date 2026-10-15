@@ -22,7 +22,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   handSpanMeters: 0.19,
 };
 
-const STORAGE_KEY = 'sightline_settings_v1';
+const STORAGE_KEY = 'andhadhun_settings_v1';
+const LEGACY_STORAGE_KEY = 'sightline_settings_v1';
 
 class SettingsManager {
   private settings: AppSettings = DEFAULT_SETTINGS;
@@ -35,7 +36,7 @@ class SettingsManager {
   private load(): void {
     if (typeof window === 'undefined') return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (raw) {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
       }

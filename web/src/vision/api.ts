@@ -49,7 +49,7 @@ export const api = {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('[SightLine API] Health check failed:', err);
+      console.warn('[AndhaDhun API] Health check failed:', err);
       return { ok: false };
     } finally {
       clearTimeout(timer);
@@ -104,7 +104,7 @@ export const api = {
         };
       }
 
-      console.error(`[SightLine API] Task "${req.task}" error:`, err.message);
+      console.error(`[AndhaDhun API] Task "${req.task}" error:`, err.message);
       return {
         task: req.task,
         ok: false,

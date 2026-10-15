@@ -1,6 +1,6 @@
-# Agent Instructions for SightLine
+# Agent Instructions for AndhaDhun
 
-Welcome, agent! You are working on **SightLine**, an AI-powered environmental awareness and navigation PWA for the visually impaired.
+Welcome, agent! You are working on **AndhaDhun**, an AI-powered environmental awareness and navigation PWA for the visually impaired.
 
 ## Core Directives
 

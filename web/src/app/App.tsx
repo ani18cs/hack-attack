@@ -364,7 +364,7 @@ export const App: React.FC = () => {
 
     // First-run spoken welcome per spec
     const welcome =
-      'SightLine is on. Obstacle alerts are active. Tap anywhere and ask me anything.';
+      'AndhaDhun is on. Obstacle alerts are active. Tap anywhere and ask me anything.';
     speech.speak(welcome, { priority: 'normal' });
   };
 
@@ -378,10 +378,10 @@ export const App: React.FC = () => {
           type="button"
           onClick={handleStartExperience}
           className="touch-target w-full h-full max-w-lg max-h-[85vh] bg-yellow-400 text-black font-black text-4xl sm:text-5xl rounded-3xl border-8 border-yellow-200 shadow-[0_0_60px_rgba(255,221,0,0.6)] flex flex-col items-center justify-center gap-6 p-6 active:scale-98 transition-transform focus:ring-8 focus:ring-white"
-          aria-label="Start SightLine Assistant. Tap anywhere on this screen to unlock camera and audio."
+          aria-label="Start AndhaDhun Assistant. Tap anywhere on this screen to unlock camera and audio."
         >
           <span className="text-8xl">👁️🔊</span>
-          <span className="text-center">START SIGHTLINE</span>
+          <span className="text-center">START ANDHADHUN</span>
           <span className="text-base sm:text-lg font-semibold text-zinc-900 bg-yellow-300 px-6 py-2 rounded-full">
             Tap anywhere to start
           </span>
@@ -452,7 +452,7 @@ export const App: React.FC = () => {
               ? `Active: ${runtimeStatus.activeTool.replace('_', ' ')}`
               : !isOnline
               ? 'Offline · Safety Active'
-              : 'SightLine Ready · Tap to Ask'}
+              : 'AndhaDhun Ready · Tap to Ask'}
           </span>
         </div>
       </div>

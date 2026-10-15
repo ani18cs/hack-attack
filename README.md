@@ -1,9 +1,9 @@
-# SightLine 👁️🔊
+# AndhaDhun 👁️🔊
 
 > **Voice-First AI Environmental Awareness & Spatial Navigation Assistant for the Visually Impaired**  
 > *Built for HackAttack 2026 (AMC Engineering College) — Track: Sustainability & Social Impact.*
 
-SightLine is an accessible Progressive Web App (PWA) that transforms any standard smartphone into a continuous spatial guide. By fusing low-latency on-device computer vision with Google Gemini 2.5 Flash cloud intelligence, SightLine translates the physical world into clear, directional speech, synthesised earcons, and urgent haptic alerts.
+AndhaDhun is an accessible Progressive Web App (PWA) that transforms any standard smartphone into a continuous spatial guide. By fusing low-latency on-device computer vision with Google Gemini 2.5 Flash cloud intelligence, AndhaDhun translates the physical world into clear, directional speech, synthesised earcons, and urgent haptic alerts.
 
 ---
 
@@ -69,9 +69,9 @@ graph TD
 ## 🔒 Privacy & Safety Directives
 
 1. **Zero Persistent Storage:** Camera frames are processed strictly in ephemeral memory and discarded immediately. No images are saved to `localStorage`, `IndexedDB`, or written to cloud disk.
-2. **No Biometric Tracking:** SightLine explicitly disallows face identification, person tracking, or biometric logging.
-3. **Honest Uncertainty:** SightLine refuses to guess on blurry currency notes, faint labels, or unconfirmed checkpoints (*"I'm not sure"* rather than hallucinating).
-4. **Primary Mobility Disclaimer:** SightLine is an environmental awareness aid; it does **NOT** replace a white cane or guide dog.
+2. **No Biometric Tracking:** AndhaDhun explicitly disallows face identification, person tracking, or biometric logging.
+3. **Honest Uncertainty:** AndhaDhun refuses to guess on blurry currency notes, faint labels, or unconfirmed checkpoints (*"I'm not sure"* rather than hallucinating).
+4. **Primary Mobility Disclaimer:** AndhaDhun is an environmental awareness aid; it does **NOT** replace a white cane or guide dog.
 
 ---
 

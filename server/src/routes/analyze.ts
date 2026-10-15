@@ -186,7 +186,7 @@ analyzeRouter.post('/analyze', analyzeLimiter, async (req: Request, res: Respons
       latencyMs: Date.now() - startTime,
     } satisfies AnalyzeResponse);
   } catch (error: any) {
-    console.error(`[SightLine Analyze Error] Task ${task}:`, error.message);
+    console.error(`[AndhaDhun Analyze Error] Task ${task}:`, error.message);
 
     // Spoken-friendly fallback messaging
     let spokenSummary = 'I had trouble analyzing the view. Please try holding the phone steady.';

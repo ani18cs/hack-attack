@@ -1,8 +1,8 @@
-# SightLine: 4-Minute Hero Demo Script & Judge Q&A Playbook
+# AndhaDhun: 4-Minute Hero Demo Script & Judge Q&A Playbook
 
 **Target Audience:** Hackathon Judges (Sustainability & Social Impact Track)  
 **Total Running Time:** Exactly 4 minutes (240 seconds)  
-**Equipment Ready:** Phone running SightLine PWA over HTTPS, Bluetooth earpiece / speaker, printed exit sign with arrow, water bottle, 100/500 Rupee note, clean plastic bottle or paper cup.
+**Equipment Ready:** Phone running AndhaDhun PWA over HTTPS, Bluetooth earpiece / speaker, printed exit sign with arrow, water bottle, 100/500 Rupee note, clean plastic bottle or paper cup.
 
 ---
 
@@ -10,9 +10,9 @@
 
 ### [0:00 - 0:30] Hook & Single-Gesture Start
 - **Speaker Action:** Tap the giant yellow tactile button on phone screen.
-- **Audio Output:** Success chime + *"Welcome to SightLine. I am your spatial navigation assistant. Say around me, read text, find washroom, or help."*
+- **Audio Output:** Success chime + *"Welcome to AndhaDhun. I am your spatial navigation assistant. Say around me, read text, find washroom, or help."*
 - **Spoken Pitch (15s):**  
-  > *"Judges, 285 million visually impaired individuals face constant physical anxiety navigating unfamiliar indoor spaces. SightLine turns any commodity smartphone into an intelligent spatial guide with zero external hardware. Every action is voice-first, accompanied by distinct spatial audio cues."*
+  > *"Judges, 285 million visually impaired individuals face constant physical anxiety navigating unfamiliar indoor spaces. AndhaDhun turns any commodity smartphone into an intelligent spatial guide with zero external hardware. Every action is voice-first, accompanied by distinct spatial audio cues."*
 
 ---
 
@@ -44,7 +44,7 @@
 - **Speaker Action:** Say: *"More."*
 - **App Behavior:** Reads secondary metadata: *"Emergency fire exit door."*
 - **Judge Commentary:**  
-  > *"A visually impaired person doesn't just need the word 'Exit'—they need to know which way to walk. SightLine fuses text with directional arrows."*
+  > *"A visually impaired person doesn't just need the word 'Exit'—they need to know which way to walk. AndhaDhun fuses text with directional arrows."*
 - **Plan B Fallback:** If internet is cut, client-side Tesseract.js runs offline and extracts text directly in-browser.
 
 ---
@@ -64,7 +64,7 @@
 - **Currency Shot:** Flash a ₹500 banknote. Say: *"Currency."* -> Speaks *"Five hundred rupee note."*
 - **Waste Shot:** Flash a plastic cup. Say: *"Waste."* -> Plays success chime + *"Plastic cup. Dry waste, blue bin."* (Sustainability track impact).
 - **Label Shot:** Flash a medicine box. Speaks product name, expiry, allergens, and safety disclaimer: *"Please verify medicine details with a person."*
-- **Plan B Fallback:** If folded note is blurry, show how SightLine refuses to guess (*"I can't tell, hold note flat and closer"*).
+- **Plan B Fallback:** If folded note is blurry, show how AndhaDhun refuses to guess (*"I can't tell, hold note flat and closer"*).
 
 ---
 
@@ -72,7 +72,7 @@
 - **Speaker Action:** Triple-tap the screen (or tap Emergency SOS button).
 - **App Behavior:** Gathers GPS + visual surroundings description: *"I need help. My location: maps.google.com/?q=... Around me: 1st floor corridor near Seminar Hall."* Shows WhatsApp and SMS dispatch buttons.
 - **Roadmap & Closing (30s):**  
-  > *"SightLine is built with strict privacy: images are never stored or logged. Our production roadmap includes: (1) ESP32 ultrasonic belt clip for 360-degree glass detection, (2) crowdsourced open venue packs for public hospitals and metro stations, and (3) on-device sub-2B vision models as WebGPU matures. Thank you!"*
+  > *"AndhaDhun is built with strict privacy: images are never stored or logged. Our production roadmap includes: (1) ESP32 ultrasonic belt clip for 360-degree glass detection, (2) crowdsourced open venue packs for public hospitals and metro stations, and (3) on-device sub-2B vision models as WebGPU matures. Thank you!"*
 
 ---
 
@@ -88,7 +88,7 @@
 > *"Hardware BLE beacons cost thousands of dollars per building and require battery maintenance. True visual SLAM melts phone batteries and drifts within minutes. Pre-mapped venue packs require just 30 minutes of walking with a smartphone to map a college or clinic, combined with live visual checkpoint verification."*
 
 ### Q4: How does it handle poor internet or cell blackouts?
-> *"On network drop, SightLine instantly announces: 'Offline. Obstacle detection still works.' Real-time collision warning continues via COCO-SSD, sign reading falls back to client-side Tesseract.js, and venue navigation operates completely offline with cached route JSON."*
+> *"On network drop, AndhaDhun instantly announces: 'Offline. Obstacle detection still works.' Real-time collision warning continues via COCO-SSD, sign reading falls back to client-side Tesseract.js, and venue navigation operates completely offline with cached route JSON."*
 
 ### Q5: What is the cost per active user?
 > *"Because high-frequency obstacle detection is 100% on-device and free, cloud VLM calls occur only on explicit user request (e.g. reading a sign or identifying a note). At Gemini Flash pricing, an entire day of active indoor navigation costs less than ₹2 ($0.02) per user."*

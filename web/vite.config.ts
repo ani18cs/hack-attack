@@ -13,8 +13,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'SightLine',
-        short_name: 'SightLine',
+        name: 'AndhaDhun',
+        short_name: 'AndhaDhun',
         description: 'Voice-first AI environmental awareness and navigation assistant',
         theme_color: '#000000',
         background_color: '#000000',

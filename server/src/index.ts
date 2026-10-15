@@ -66,6 +66,6 @@ app.use((_req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`[SightLine Server] Running on http://localhost:${PORT}`);
-  console.log(`[SightLine Server] Allowed origin: ${ALLOWED_ORIGIN}`);
+  console.log(`[AndhaDhun Server] Running on http://localhost:${PORT}`);
+  console.log(`[AndhaDhun Server] Allowed origin: ${ALLOWED_ORIGIN}`);
 });

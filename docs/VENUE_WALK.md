@@ -1,4 +1,4 @@
-# SightLine Venue Walk Data Collection Protocol
+# AndhaDhun Venue Walk Data Collection Protocol
 
 **Venue:** AMC Engineering College, Bengaluru (HackAttack 2026)  
 **Target Duration:** ~30 minutes  
@@ -8,7 +8,7 @@
 
 ## 1. Preparation Checklist
 - [ ] Smartphone with camera and compass (or built-in Notes app)
-- [ ] SightLine PWA running on the phone (`npm run dev --workspace=web`)
+- [ ] AndhaDhun PWA running on the phone (`npm run dev --workspace=web`)
 - [ ] Printed QR tags (or paper labels): `LM-ENTRANCE`, `LM-WASH1`, `LM-HALL`, `LM-CAFE`
 - [ ] Tape or blu-tack to place QR tags at chest height (1.2m – 1.4m) near doors
 
@@ -64,7 +64,7 @@ Stand at the starting landmark facing the walking direction. Walk naturally towa
 ---
 
 ## 5. Mobile Acceptance Test (2 Minutes)
-1. Open SightLine on phone: Tap **Navigate**.
+1. Open AndhaDhun on phone: Tap **Navigate**.
 2. Voice command: *"Take me to the washroom."*
 3. Verify:
    - Voice announces: *"Starting route to Washroom Ground Floor. Step 1: Walk straight about 20 steps."*

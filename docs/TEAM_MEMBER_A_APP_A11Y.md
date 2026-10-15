@@ -139,7 +139,7 @@ Because mobile browsers restrict camera and microphone access on non-secure orig
 cloudflared tunnel --url http://localhost:5173
 ```
 - Open the resulting `https://...trycloudflare.com` URL in **Chrome on Android** or **Safari on iOS**.
-- Tap the giant **Start SightLine** button.
+- Tap the giant **Start AndhaDhun** button.
 - Speak commands: *"What is around me"*, *"Find washroom"*, *"हिंदी"*, *"Stop"*.
 
 ---

@@ -256,7 +256,7 @@ export const FindWashroom: React.FC<FindWashroomProps> = ({
             <span className="text-6xl mb-4">🔄</span>
             <p className="text-2xl font-black text-yellow-400 mb-2">Scanning 360°</p>
             <p className="text-zinc-300 text-base mb-4">
-              Rotate slowly. SightLine is scanning every 2 seconds for restroom signs, WC, toilets, and pictograms.
+              Rotate slowly. AndhaDhun is scanning every 2 seconds for restroom signs, WC, toilets, and pictograms.
             </p>
             <div className="w-full bg-zinc-800 rounded-full h-4 overflow-hidden border border-zinc-700">
               <div

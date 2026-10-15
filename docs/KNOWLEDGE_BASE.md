@@ -1,6 +1,6 @@
-# SightLine — Project Knowledge Base
+# AndhaDhun — Project Knowledge Base
 
-> Working name: **SightLine**. Voice-first, phone-based assistant that helps visually impaired people perceive and navigate their surroundings.
+> Working name: **AndhaDhun**. Voice-first, phone-based assistant that helps visually impaired people perceive and navigate their surroundings.
 > This file is the single source of truth for humans and for the AI agents. Read it fully before writing code.
 
 ---
@@ -121,7 +121,7 @@ Phone Browser (PWA, HTTPS)
 ## 5. Repository Layout (Monorepo)
 
 ```
-sightline/
+andhadhun/
 ├─ package.json              # npm workspaces: web, server
 ├─ docs/
 │  ├─ KNOWLEDGE_BASE.md      # Source of truth

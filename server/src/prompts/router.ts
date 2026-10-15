@@ -184,7 +184,7 @@ export const ROUTER_FUNCTION_DECLARATIONS = [
   },
   {
     name: 'help',
-    description: 'Explain available commands and how to interact with SightLine.',
+    description: 'Explain available commands and how to interact with AndhaDhun.',
     parameters: {
       type: 'OBJECT',
       properties: {},
