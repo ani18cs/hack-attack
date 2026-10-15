@@ -206,7 +206,7 @@ describe('Spatial Engine Unit Tests', () => {
       expect(result.direction).toBe('ahead');
       expect(result.zone).toBe('path');
       expect(result.distance).toBe('close');
-      expect(result.formattedDistance).toMatch(/about 2 strides|about 1 stride/);
+      expect(result.formattedDistance).toMatch(/about 3 hand spans|about 2 hand spans/);
       expect(result.score).toBe(0.88);
     });
 

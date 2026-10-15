@@ -135,7 +135,9 @@ export function matchFastPath(rawTranscript: string, state?: AskState): ToolCall
     };
   }
 
-  const heightMatch = transcript.match(/(?:set\s+(?:my\s+)?height\s+(?:to\s+)?|height\s+is\s+)(\d{2,3})(?:\s*cm)?/i);
+  const heightMatch = transcript.match(
+    /(?:set\s+(?:my\s+)?height\s+(?:to\s+)?|height\s+is\s+)(\d{2,3})(?:\s*(?:cm|centimetres|centimeters))?/i
+  );
   if (heightMatch && heightMatch[1]) {
     const heightCm = parseInt(heightMatch[1], 10);
     if (heightCm >= 90 && heightCm <= 240) {

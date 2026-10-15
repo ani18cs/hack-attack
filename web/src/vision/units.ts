@@ -1,45 +1,117 @@
+import { GUIDANCE, updateGuidanceConfig } from '../config/guidance';
 import type { DistanceBucket, UnitPreference } from '../types';
 
 export interface UnitsConfig {
-  strideMeters: number; // Stride length in meters (default 0.7)
-  handSpanMeters: number; // Hand span in meters (thumb to pinky, default 0.19)
+  strideMeters: number; // Stride length in meters (default 0.30)
+  handSpanMeters: number; // Hand span in meters (default 0.50)
+  walkStepMeters: number; // Real footstep length for the pedometer (default 0.60)
   userHeightMeters?: number; // Optional user height in meters
+  phoneHeightMeters?: number; // Derived or calibrated chest-height holding position
   unitPreference: UnitPreference; // 'strides' | 'metres'
 }
 
 export const DEFAULT_UNITS_CONFIG: UnitsConfig = {
-  strideMeters: 0.7,
-  handSpanMeters: 0.19,
+  strideMeters: GUIDANCE.units.strideMeters,
+  handSpanMeters: GUIDANCE.units.handSpanMeters,
+  walkStepMeters: GUIDANCE.units.walkStepMeters,
   unitPreference: 'strides',
 };
 
 /**
- * Derives personalized stride and hand-span lengths from user height using anthropometric rules of thumb.
- * Note: These are population approximations (stride ~ 0.415 * height; hand span ~ 0.11 * height).
- * True individual values vary with biomechanics and pace.
+ * Derives personalized phone holding height and stride lengths from user height.
+ * Default holding height: chest height ~ 0.7 * body height.
  */
 export function deriveFromHeight(heightMeters: number): {
   strideMeters: number;
   handSpanMeters: number;
+  phoneHeightMeters: number;
 } {
-  // Approximation: human stride is roughly 41.5% of body height
-  const strideMeters = Math.round(0.415 * heightMeters * 100) / 100;
-  // Approximation: open hand span (thumb tip to pinky tip) is roughly 11% of body height
-  const handSpanMeters = Math.round(0.11 * heightMeters * 100) / 100;
+  const strideMeters = GUIDANCE.units.strideMeters;
+  const handSpanMeters = GUIDANCE.units.handSpanMeters;
+  const phoneHeightMeters = Math.round(0.7 * heightMeters * 100) / 100;
 
-  return { strideMeters, handSpanMeters };
+  return { strideMeters, handSpanMeters, phoneHeightMeters };
 }
 
 /**
- * Calibrates stride length from a known walking distance and counted steps.
- * e.g. walking 10 meters in 14 steps => stride length ~ 0.71 meters.
+ * Converts metric distance to strides (using product unit stride = 0.30m).
  */
-export function calibrateFromWalk(knownDistanceMeters: number, stepsCounted: number): number {
-  if (stepsCounted <= 0) return DEFAULT_UNITS_CONFIG.strideMeters;
-  const raw = knownDistanceMeters / stepsCounted;
-  // Clamp to realistic adult human stride range (0.4m to 1.2m)
-  const clamped = Math.max(0.4, Math.min(1.2, raw));
-  return Math.round(clamped * 100) / 100;
+export function metersToStrides(
+  meters: number,
+  strideMeters = GUIDANCE.units.strideMeters
+): number {
+  if (strideMeters <= 0) return 0;
+  return meters / strideMeters;
+}
+
+/**
+ * Converts metric distance to hand spans (using product unit hand span = 0.50m).
+ */
+export function metersToHandSpans(
+  meters: number,
+  handSpanMeters = GUIDANCE.units.handSpanMeters
+): number {
+  if (handSpanMeters <= 0) return 0;
+  return meters / handSpanMeters;
+}
+
+/**
+ * Calculates the number of strides required to laterally step around an obstacle of width objectWidthM.
+ * Adds a safety buffer margin (default 0.5m) so the user clears the obstacle completely.
+ */
+export function lateralShiftStrides(
+  objectWidthM: number,
+  marginM = 0.5,
+  strideMeters = GUIDANCE.units.strideMeters
+): number {
+  const neededMeters = objectWidthM / 2 + marginM;
+  return Math.max(1, Math.ceil(neededMeters / strideMeters));
+}
+
+/**
+ * Calibrates the real footstep length for the pedometer (walkStepMeters)
+ * from a known walking distance (e.g. 6.0m or 10.0m) and counted steps.
+ */
+export function calibrateWalkStep(
+  knownDistanceM: number,
+  stepsCounted: number
+): number {
+  if (stepsCounted <= 0) return GUIDANCE.units.walkStepMeters;
+  const raw = knownDistanceM / stepsCounted;
+  // Clamp to realistic adult human walking step range (0.35m to 1.10m)
+  const clamped = Math.max(0.35, Math.min(1.1, raw));
+  const rounded = Math.round(clamped * 100) / 100;
+
+  GUIDANCE.units.walkStepMeters = rounded;
+  updateGuidanceConfig({
+    units: {
+      ...GUIDANCE.units,
+      walkStepMeters: rounded,
+    },
+  });
+
+  return rounded;
+}
+
+export const calibrateFromWalk = calibrateWalkStep;
+
+/**
+ * Converts coarse distance buckets (from VLM server) into meters.
+ * Server rule: Gemini is never asked for meters; conversion happens deterministically on client.
+ */
+export function bucketToMeters(bucket: DistanceBucket): number {
+  switch (bucket) {
+    case 'very-close':
+      return 0.8;
+    case 'close':
+      return 1.5;
+    case 'near':
+      return 3.0;
+    case 'far':
+      return 6.0;
+    default:
+      return 3.0;
+  }
 }
 
 export interface FormatDistanceOptions {
@@ -51,22 +123,27 @@ export interface FormatDistanceOptions {
 }
 
 /**
- * Formats a metric distance into natural, intuitive human terms (strides or hand spans).
- * All distances include "about", "less than", or "more than" to reflect honest measurement uncertainty.
- * For hazards, rounds conservatively (downward) so hazards are not understated.
+ * Formats a metric distance into natural, intuitive human guidance units.
+ *
+ * Rules:
+ * - below 0.5m: "less than a hand span"
+ * - 0.5m to handSpanMaxM (2.0m): "about N hand spans" (rounded to nearest whole unit; hazards round down)
+ * - above 2.0m: "about N strides" (rounded to nearest whole unit; hazards round down)
+ * - Always prefix with "about" (except "less than ...")
+ * - For hazards, rounds down conservatively (says closer).
  */
 export function formatDistance(
   meters: number,
   options: FormatDistanceOptions = {}
 ): string {
-  const context = options.context ?? 'walking';
   const preference = options.preference ?? 'strides';
-  const stride = options.strideMeters ?? DEFAULT_UNITS_CONFIG.strideMeters;
-  const handSpan = options.handSpanMeters ?? DEFAULT_UNITS_CONFIG.handSpanMeters;
+  const stride = options.strideMeters ?? GUIDANCE.units.strideMeters;
+  const handSpan = options.handSpanMeters ?? GUIDANCE.units.handSpanMeters;
+  const handSpanMaxM = GUIDANCE.units.handSpanMaxM; // 2.0m
   const isHazard = options.isHazard ?? false;
 
   if (preference === 'metres') {
-    if (meters < 0.8) {
+    if (meters < 0.5) {
       return 'less than a metre';
     }
     const roundedMeters = isHazard ? Math.floor(meters) : Math.round(meters);
@@ -76,33 +153,35 @@ export function formatDistance(
     return `about ${roundedMeters} metres`;
   }
 
-  // Unit preference: 'strides'
-  // In object-finding mode (e.g. finding a bottle, keys, cup) within arm's reach (< 0.9m), use hand spans
-  if (context === 'object' && meters < 0.9) {
+  // Unit preference: 'strides' & 'hand spans'
+  // Rule 1: Below 0.5m -> "less than a hand span"
+  if (meters < 0.5) {
+    return 'less than a hand span';
+  }
+
+  // Rule 2: From 0.5m to handSpanMaxM (2.0m) -> speak hand spans
+  if (meters <= handSpanMaxM) {
     const rawSpans = meters / handSpan;
-    const spans = Math.round(rawSpans);
-    if (spans <= 1) {
+    // For hazards: round down conservatively so the obstacle sounds closer
+    const spans = isHazard ? Math.floor(rawSpans) : Math.round(rawSpans);
+    const effectiveSpans = Math.max(1, spans);
+
+    if (effectiveSpans === 1) {
       return 'about 1 hand span';
     }
-    return `about ${spans} hand spans`;
+    return `about ${effectiveSpans} ${GUIDANCE.units.unitNames.handSpan}`;
   }
 
-  // Walking context: calculate stride count
+  // Rule 3: Above handSpanMaxM (2.0m) -> speak strides
   const rawStrides = meters / stride;
-  // Conservative rounding for hazards: round down so the obstacle sounds closer
-  const effectiveStrides = isHazard ? Math.floor(rawStrides) : rawStrides;
+  // For hazards: round down conservatively
+  const strides = isHazard ? Math.floor(rawStrides) : Math.round(rawStrides);
+  const effectiveStrides = Math.max(1, strides);
 
-  if (effectiveStrides < 1.0) {
-    return 'less than a stride';
-  } else if (effectiveStrides <= 2.4) {
-    return 'about 2 strides';
-  } else if (effectiveStrides <= 3.8) {
-    return 'about 3 strides';
-  } else if (effectiveStrides <= 6.5) {
-    return 'about 5 strides';
-  } else {
-    return 'more than 8 strides';
+  if (effectiveStrides === 1) {
+    return 'about 1 stride';
   }
+  return `about ${effectiveStrides} ${GUIDANCE.units.unitNames.stride}`;
 }
 
 /**
@@ -112,27 +191,6 @@ export function formatDistanceBucketToStrides(
   bucket: DistanceBucket,
   preference: UnitPreference = 'strides'
 ): string {
-  if (preference === 'metres') {
-    switch (bucket) {
-      case 'very-close':
-        return 'less than a metre';
-      case 'close':
-        return 'about 2 metres';
-      case 'near':
-        return 'about 4 metres';
-      case 'far':
-        return 'more than 6 metres';
-    }
-  }
-
-  switch (bucket) {
-    case 'very-close':
-      return 'less than a stride';
-    case 'close':
-      return 'about 2 strides';
-    case 'near':
-      return 'about 5 strides';
-    case 'far':
-      return 'more than 8 strides';
-  }
+  const meters = bucketToMeters(bucket);
+  return formatDistance(meters, { preference });
 }

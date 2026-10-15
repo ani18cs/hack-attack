@@ -1,3 +1,4 @@
+import { GUIDANCE } from '../config/guidance';
 import { Direction, DistanceBucket, SceneObject, UnitPreference } from '../types';
 import { FOCUS_CONFIG, FocusConfig, getDetectionZone } from './focus';
 import { DEFAULT_UNITS_CONFIG, formatDistance } from './units';
@@ -14,8 +15,8 @@ export interface RawDetection {
 export const SPATIAL_CONFIG = {
   verticalFovDeg: 60,
   defaultPhoneHeightMeters: 1.2,
-  dangerThresholdStrides: 2.0,
-  dangerMarginStrides: 0.2, // Conservative safety margin (~2.2 strides)
+  dangerThresholdStrides: 4.0, // ~1.2m at 0.30m stride (matches GUIDANCE.distance.stopM)
+  dangerMarginStrides: 0.6, // ~0.18m safety margin
   minPlausiblePitchDeg: 5,
   maxPlausiblePitchDeg: 75,
   rapidGrowthThreshold: 0.3, // > 30% area growth across frames
@@ -28,24 +29,24 @@ export const SPATIAL_CONFIG = {
 export const CLASS_HEIGHT: Record<string, number> = {
   person: 1.7,
   chair: 0.9,
-  couch: 0.85,
-  sofa: 0.85,
-  bench: 0.8,
   'dining table': 0.75,
   dining_table: 0.75,
   table: 0.75,
+  couch: 0.85,
+  sofa: 0.85,
+  bench: 0.5,
+  bottle: 0.25,
+  cup: 0.1,
+  backpack: 0.45,
+  suitcase: 0.6,
   bicycle: 1.0,
   motorcycle: 1.1,
   car: 1.5,
-  bus: 2.8,
-  truck: 2.8,
+  bus: 3.0,
+  truck: 3.0,
   dog: 0.5,
   cat: 0.3,
-  suitcase: 0.65,
-  backpack: 0.5,
   umbrella: 0.9,
-  bottle: 0.25,
-  cup: 0.1,
   laptop: 0.25,
   cell_phone: 0.15,
   phone: 0.15,
@@ -156,14 +157,13 @@ export function estimateDistanceByGroundPlane(
  */
 export function mapDistanceToBucket(
   distanceMeters: number,
-  strideMeters = DEFAULT_UNITS_CONFIG.strideMeters
+  _strideMeters = GUIDANCE.units.strideMeters
 ): DistanceBucket {
-  const strides = distanceMeters / strideMeters;
-  if (strides < 1.0) {
+  if (distanceMeters < 1.1) {
     return 'very-close';
-  } else if (strides <= 2.4) {
+  } else if (distanceMeters <= 2.2) {
     return 'close';
-  } else if (strides <= 5.5) {
+  } else if (distanceMeters <= 4.5) {
     return 'near';
   } else {
     return 'far';
@@ -307,8 +307,8 @@ export function processSpatialObject(
   const previousAreaRatio = options.previousAreaRatio;
   const pitchBelowHorizonDeg = options.pitchBelowHorizonDeg;
   const phoneHeightMeters = options.phoneHeightMeters ?? SPATIAL_CONFIG.defaultPhoneHeightMeters;
-  const strideMeters = options.strideMeters ?? DEFAULT_UNITS_CONFIG.strideMeters;
-  const handSpanMeters = options.handSpanMeters ?? DEFAULT_UNITS_CONFIG.handSpanMeters;
+  const strideMeters = options.strideMeters ?? GUIDANCE.units.strideMeters;
+  const handSpanMeters = options.handSpanMeters ?? GUIDANCE.units.handSpanMeters;
   const unitPreference = options.unitPreference ?? DEFAULT_UNITS_CONFIG.unitPreference;
   const focusConfig = options.focusConfig ?? FOCUS_CONFIG;
 
@@ -346,11 +346,12 @@ export function processSpatialObject(
   // Zone policy evaluation
   let danger = false;
   if (zone === 'path') {
-    // Treat anything under 2 strides in path as danger with conservative margin
-    const under2Strides =
+    // Treat anything within stopM (~1.2m) or under dangerThresholdStrides in path as immediate danger
+    const underDangerThreshold =
+      distanceMeters <= GUIDANCE.distance.stopM ||
       distanceStrides <= SPATIAL_CONFIG.dangerThresholdStrides + SPATIAL_CONFIG.dangerMarginStrides;
     danger =
-      under2Strides ||
+      underDangerThreshold ||
       isHazardous(centerX, centerY, rawAreaRatio, previousAreaRatio, distanceStrides);
   } else if (zone === 'side') {
     // Side zone danger: only if very close or area is growing fast over frames

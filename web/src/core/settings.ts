@@ -10,6 +10,7 @@ export interface AppSettings {
   strideMeters: number;
   handSpanMeters: number;
   userHeightMeters?: number;
+  phoneHeightMeters?: number;
   speechRate?: number;
 }
 
@@ -19,8 +20,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   dashboardVisible: false,
   trustedContact: '+919876543210',
   unitPreference: 'strides',
-  strideMeters: 0.7,
-  handSpanMeters: 0.19,
+  strideMeters: 0.30,
+  handSpanMeters: 0.50,
+  phoneHeightMeters: 1.2,
   speechRate: 0.85,
 };
 
@@ -88,6 +90,7 @@ class SettingsManager {
     this.settings.userHeightMeters = heightMeters;
     this.settings.strideMeters = derived.strideMeters;
     this.settings.handSpanMeters = derived.handSpanMeters;
+    this.settings.phoneHeightMeters = derived.phoneHeightMeters;
     this.save();
   }
 

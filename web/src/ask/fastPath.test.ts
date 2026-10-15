@@ -76,4 +76,29 @@ describe('matchFastPath', () => {
     expect(matchFastPath('kannada')?.tool).toBe('set_language');
     expect(matchFastPath('english')?.tool).toBe('set_language');
   });
+
+  it('matches units and height voice commands', () => {
+    const heightRes = matchFastPath('set my height to 170 centimetres');
+    expect(heightRes?.tool).toBe('set_height');
+    expect(heightRes?.args.heightCm).toBe(170);
+
+    const metresRes = matchFastPath('use metres');
+    expect(metresRes?.tool).toBe('set_units');
+    expect(metresRes?.args.preference).toBe('metres');
+
+    const stridesRes = matchFastPath('use strides');
+    expect(stridesRes?.tool).toBe('set_units');
+    expect(stridesRes?.args.preference).toBe('strides');
+  });
+
+  it('matches speech speed voice commands', () => {
+    expect(matchFastPath('speak slower')?.tool).toBe('set_speech_rate');
+    expect(matchFastPath('speak slower')?.args.action).toBe('slower');
+
+    expect(matchFastPath('speak faster')?.tool).toBe('set_speech_rate');
+    expect(matchFastPath('speak faster')?.args.action).toBe('faster');
+
+    expect(matchFastPath('normal speed')?.tool).toBe('set_speech_rate');
+    expect(matchFastPath('normal speed')?.args.action).toBe('normal');
+  });
 });

@@ -819,20 +819,30 @@ export class ToolRuntime {
   /* Tool: set_units                                                            */
   /* -------------------------------------------------------------------------- */
   private handleSetUnits(pref: 'strides' | 'metres'): void {
-    settings.setUnitPreference(pref);
-    speech.speak(`Using ${pref === 'metres' ? 'metres' : 'strides'}.`, { priority: 'normal' });
+    try {
+      settings.setUnitPreference(pref);
+      speech.speak(`Using ${pref === 'metres' ? 'metres' : 'strides'}.`, { priority: 'normal' });
+    } catch (err) {
+      console.warn('[ToolRuntime] Failed to save unit preference:', err);
+      speech.speak('Could not save unit preference.', { priority: 'normal' });
+    }
   }
 
   /* -------------------------------------------------------------------------- */
   /* Tool: set_height                                                           */
   /* -------------------------------------------------------------------------- */
   private handleSetHeight(heightCm: number): void {
-    const heightM = heightCm / 100;
-    settings.setUserHeight(heightM);
-    const stride = settings.getSettings().strideMeters;
-    speech.speak(`Height set to ${heightCm} centimetres. Stride is about ${stride} metres.`, {
-      priority: 'normal',
-    });
+    try {
+      const heightM = heightCm / 100;
+      settings.setUserHeight(heightM);
+      const phoneHeight = settings.getSettings().phoneHeightMeters ?? Math.round(0.7 * heightM * 100) / 100;
+      speech.speak(`Height set to ${heightCm} centimetres. Holding height estimated at ${phoneHeight} metres.`, {
+        priority: 'normal',
+      });
+    } catch (err) {
+      console.warn('[ToolRuntime] Failed to save user height:', err);
+      speech.speak('Could not save height.', { priority: 'normal' });
+    }
   }
 
   /* -------------------------------------------------------------------------- */

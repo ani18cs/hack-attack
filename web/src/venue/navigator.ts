@@ -1,6 +1,6 @@
 import { Landmark, NavigatorState, Route, RouteStep, VenuePack } from './types';
 import { matchLandmarkByVoice } from './localize';
-import { settings } from '../core/settings';
+import { GUIDANCE } from '../config/guidance';
 
 export interface NavigatorEvent {
   state: NavigatorState;
@@ -142,15 +142,16 @@ export class VenueNavigator {
 
   /**
    * Evaluates if step count is within the +/- 25% tolerance window to automatically advance.
-   * Adjusts for the user's calibrated stride length so spoken distances and steps agree.
+   * Pedometer step counts strictly use walkStepMeters (real footstep length ~0.60m), NOT the 30 cm stride unit.
+   * Route instructions in the pack stay in "steps" (real footsteps).
    */
   public isStepTargetReached(totalStepsNow: number): boolean {
     const step = this.getCurrentStep();
     if (!step || !step.steps) return false;
 
-    const strideMeters = settings.getSettings().strideMeters || 0.7;
-    // Map assuming standard 0.7m reference stride
-    const adjustedTarget = Math.round((step.steps * 0.7) / strideMeters);
+    const walkStepMeters = GUIDANCE.units.walkStepMeters || 0.60;
+    // Map assuming standard 0.60m reference walking step
+    const adjustedTarget = Math.round((step.steps * 0.60) / walkStepMeters);
 
     const walked = totalStepsNow - this.baseStepCount;
     // Advance when user has completed at least 75% of the target step count
@@ -158,13 +159,19 @@ export class VenueNavigator {
   }
 
   /**
-   * Optional stride calibration step within the venue flow.
+   * Optional spoken calibration flow:
+   * "Say calibrate, then walk ten steps, then say done"
+   * Uses the pedometer count over a known 6 m mark if available.
    */
-  public startStrideCalibration(knownDistanceMeters = 10): NavigatorEvent {
+  public startStepCalibration(_knownDistanceMeters = 6.0): NavigatorEvent {
     return this.emitEvent(
-      `Calibration mode: Walk ${knownDistanceMeters} metres counting your strides, then tap or say calibrate my stride.`,
+      'Say calibrate, then walk ten steps, then say done.',
       false
     );
+  }
+
+  public startStrideCalibration(knownDistanceMeters = 6.0): NavigatorEvent {
+    return this.startStepCalibration(knownDistanceMeters);
   }
 
   /**
