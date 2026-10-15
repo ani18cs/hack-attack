@@ -4,6 +4,10 @@ import type { RouterTool } from '../ask/types';
 import { settings, type AppSettings } from '../core/settings';
 import { speech } from '../core/speech';
 import type { SceneObject } from '../types';
+import { GUIDANCE } from '../config/guidance';
+import { hapticChannel, type HapticChannelStatus } from '../core/hapticChannel';
+import type { GuidanceState, BlockerInfo } from '../guidance/engine';
+import { formatDistance } from '../vision/units';
 
 interface ControlPanelProps {
   isOpen: boolean;
@@ -13,6 +17,8 @@ interface ControlPanelProps {
   serverLatencyMs: number;
   isOnline: boolean;
   detectedObjects: SceneObject[];
+  guidanceState?: GuidanceState;
+  nearestBlocker?: BlockerInfo | null;
   onSelectTool: (tool: RouterTool, args?: Record<string, any>) => void;
   onTriggerSos: () => void;
 }
@@ -25,16 +31,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   serverLatencyMs,
   isOnline,
   detectedObjects,
+  guidanceState,
+  nearestBlocker,
   onSelectTool,
   onTriggerSos,
 }) => {
   const [logs, setLogs] = useState<AskLogItem[]>([]);
   const [userSettings, setUserSettings] = useState<AppSettings>(settings.getSettings());
   const [sosNumberInput, setSosNumberInput] = useState(userSettings.trustedContact || '+919876543210');
+  const [hapticStatus, setHapticStatus] = useState<HapticChannelStatus>(hapticChannel.getStatus());
 
   useEffect(() => {
-    const unsub = askLog.subscribe((updated) => setLogs(updated));
-    return unsub;
+    const unsubLogs = askLog.subscribe((updated) => setLogs(updated));
+    const unsubHaptic = hapticChannel.subscribe((st) => setHapticStatus(st));
+    return () => {
+      unsubLogs();
+      unsubHaptic();
+    };
   }, []);
 
   useEffect(() => {
@@ -274,10 +287,67 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        {/* Section 3: Judge Diagnostics Dashboard */}
+        {/* Section 3: Navigation Guidance & Haptic Dashboard */}
+        <div className="bg-zinc-900/90 p-4 rounded-2xl border border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-400">
+              Guidance & Haptics
+            </h2>
+            <span
+              className={`px-3 py-0.5 rounded-full text-xs font-black tracking-wider uppercase ${
+                (guidanceState || hapticStatus.state) === 'STOP'
+                  ? 'bg-red-600 text-white animate-pulse'
+                  : (guidanceState || hapticStatus.state) === 'CAUTION'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-emerald-600 text-white'
+              }`}
+            >
+              {guidanceState || hapticStatus.state}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-black/60 p-2.5 rounded-xl border border-zinc-800">
+              <div className="text-zinc-400 text-[11px]">Nearest Blocker</div>
+              <div className="font-bold text-white truncate mt-0.5">
+                {nearestBlocker ? nearestBlocker.label : 'None (Path Clear)'}
+              </div>
+              <div className="text-[11px] text-zinc-400 mt-0.5">
+                {nearestBlocker
+                  ? `${nearestBlocker.distanceM.toFixed(1)}m (${formatDistance(nearestBlocker.distanceM)}) · ${nearestBlocker.direction}`
+                  : 'Clear forward corridor'}
+              </div>
+            </div>
+
+            <div className="bg-black/60 p-2.5 rounded-xl border border-zinc-800">
+              <div className="text-zinc-400 text-[11px]">Channel Mode</div>
+              <div className="font-bold text-white truncate mt-0.5">
+                {hapticStatus.hasVibration ? 'Vibration' : 'Audio Fallback'}
+              </div>
+              <div className="text-[11px] text-zinc-400 mt-0.5">
+                {hapticStatus.hasVibration
+                  ? `Heartbeat: ${GUIDANCE.haptics.clearIntervalMs}ms`
+                  : 'iOS audio tones active'}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-xs bg-black/40 px-3 py-2 rounded-xl border border-zinc-800">
+            <span className="text-zinc-400">Safety Watchdog:</span>
+            <span
+              className={`font-mono font-bold ${
+                hapticStatus.isWatchdogPaused ? 'text-red-400' : 'text-emerald-400'
+              }`}
+            >
+              {hapticStatus.isWatchdogPaused ? '⚠️ Vision Paused' : 'Healthy (Active)'}
+            </span>
+          </div>
+        </div>
+
+        {/* Section 4: Judge Diagnostics */}
         <div className="bg-zinc-900/90 p-4 rounded-2xl border border-zinc-800 space-y-2">
           <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-400">
-            Judge Diagnostics
+            Performance Metrics
           </h2>
           <div className="grid grid-cols-4 gap-2 text-center text-xs">
             <div className="bg-black/60 p-2 rounded-xl border border-zinc-800">

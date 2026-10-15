@@ -10,9 +10,10 @@
    - Single-camera mobile phones lack hardware depth sensors (LiDAR/Time-of-Flight). Distance is an estimate (roughly **±30% to ±50%**) geometrically inferred from bounding box height against standard prior heights, and ground-plane ray angles using `deviceorientation` pitch.
    - Perceived distance depends heavily on phone holding height (chest height vs eye level), phone downward tilt, user posture, and camera focal parameters.
    - All spoken distances honestly include qualifiers like *"about"*, *"less than"*, or *"more than"*. Never rely on estimated distance for life-critical clearance.
-2. **Stride and Hand-Span Units are Approximations:**
-   - Default stride (0.7m) and hand span (0.19m) lengths—or values derived from user height (`stride ≈ 0.415 * height`, `hand-span ≈ 0.11 * height`)—are population anthropometric rules of thumb.
-   - Individual walking pace, terrain, footwear, and arm geometry cause real variation. Users can calibrate stride length via voice command (*"calibrate my stride"*) or switch to metric (*"use metres"*).
+2. **Stride and Hand-Span Units are Approximations & Specific Product Decisions:**
+   - **Hand-span product decision:** `GUIDANCE.units.handSpanMeters` is set to `0.50m` (50 cm). A normal adult hand span (thumb to pinky) is about 18–23 cm; 50 cm is anatomically closer to a human forearm length. If a user physically judges "hand span" with their own hand, they will misjudge distance by approximately 2.5x. The label lives in `GUIDANCE.units.unitNames.handSpan` and can be renamed (e.g. to "forearm") in one line.
+   - **Stride product decision:** `GUIDANCE.units.strideMeters` is set to `0.30m` (30 cm). A normal adult walking step is about 60–75 cm; a 30 cm "stride" is closer to one foot length. If a user takes normal walking steps while the app announces "about 8 strides", they will overshoot the target by about 2x. For this reason, `walkStepMeters` (0.60m) is strictly separated as an independent constant used only for pedometer-based venue navigation, with optional calibration.
+   - Default stride and hand span lengths can be calibrated or switched to metric (*"use metres"*).
 3. **Walking Path Corridor & Peripheral Hazards:**
    - To reduce cognitive cognitive load and speech chatter, AndhaDhun prioritizes a forward walking corridor (central 60% of frame, below top 25%).
    - Side zones only announce imminent collision hazards (objects very close or growing rapidly over consecutive frames). Distant peripheral obstacles outside the walking corridor are intentionally suppressed.

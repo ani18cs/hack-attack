@@ -16,6 +16,8 @@ import { announcer } from '../vision/announcer';
 import { detector } from '../vision/detector';
 import { FOCUS_CONFIG } from '../vision/focus';
 import { processSpatialObject } from '../vision/spatial';
+import { GuidanceEngine, type GuidanceState, type BlockerInfo, type GuidanceInputItem } from '../guidance/engine';
+import { hapticChannel } from '../core/hapticChannel';
 
 export const App: React.FC = () => {
   const [hasStarted, setHasStarted] = useState(false);
@@ -25,6 +27,11 @@ export const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [runtimeStatus, setRuntimeStatus] = useState<ToolRuntimeStatus>(toolRuntime.getStatus());
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
+
+  // Guidance state & nearest blocker
+  const [guidanceState, setGuidanceState] = useState<GuidanceState>('CLEAR');
+  const [nearestBlocker, setNearestBlocker] = useState<BlockerInfo | null>(null);
+  const guidanceEngineRef = useRef(new GuidanceEngine());
 
   // Diagnostics and live detections
   const [detectedObjects, setDetectedObjects] = useState<SceneObject[]>([]);
@@ -213,24 +220,33 @@ export const App: React.FC = () => {
       // Render detection boxes on viewfinder HUD
       renderOverlay(rawDetections, vw, vh);
 
-      // Layer 1 deterministic safety guard: obstacle danger alert
-      const dangerObject = objects.find((o) => o.danger);
-      if (dangerObject) {
-        // Accelerating proximity beeps
-        let beepInterval = 500;
-        if (dangerObject.distance === 'very-close') beepInterval = 130;
-        else if (dangerObject.distance === 'close') beepInterval = 280;
+      // Notify watchdog of fresh detector frame
+      hapticChannel.notifyFrameProcessed(Date.now());
 
-        earcons.startProximityBeep(beepInterval, 700);
+      // Feed into GuidanceEngine for safety state machine & haptic language
+      const guidanceItems: GuidanceInputItem[] = objects.map((o) => ({
+        label: o.label,
+        distanceM: o.distanceMeters ?? 3.0,
+        direction: o.direction,
+        zone: o.zone,
+        widthM: o.bbox ? (o.bbox[2] / vw) * 1.8 : undefined,
+        danger: o.danger,
+      }));
+      const guidanceOutput = guidanceEngineRef.current.processFrame({
+        items: guidanceItems,
+        timestamp: Date.now(),
+      });
+      setGuidanceState(guidanceOutput.state);
+      setNearestBlocker(guidanceOutput.nearestBlocker);
+      hapticChannel.setState(guidanceOutput.state);
 
+      // Spoken alerts on critical transitions (e.g. entering STOP)
+      if (guidanceOutput.stateChanged && guidanceOutput.state === 'STOP' && guidanceOutput.nearestBlocker) {
         const currentTime = Date.now();
-        if (currentTime - lastDangerAlertTime.current >= 2400) {
+        if (currentTime - lastDangerAlertTime.current >= 2000) {
           lastDangerAlertTime.current = currentTime;
-          haptics.pulseDanger();
-          speech.speak(`Stop. ${dangerObject.label} ahead.`, { priority: 'danger' });
+          speech.speak(`Stop. ${guidanceOutput.nearestBlocker.label} ahead.`, { priority: 'danger' });
         }
-      } else {
-        earcons.stopProximityBeep();
       }
 
       // Layer 1 non-danger announcer: suppressed during listening or speaking
@@ -242,7 +258,7 @@ export const App: React.FC = () => {
     return () => {
       isMounted = false;
       unsubDetector();
-      earcons.stopProximityBeep();
+      hapticChannel.stop();
     };
   }, [hasStarted]);
 
@@ -362,9 +378,12 @@ export const App: React.FC = () => {
       speech.speak('Camera permission denied or camera unavailable.', { priority: 'danger' });
     }
 
+    // Start continuous guidance haptic channel
+    hapticChannel.start();
+
     // First-run spoken welcome per spec
     const welcome =
-      'AndhaDhun is on. Obstacle alerts are active. Tap anywhere and ask me anything.';
+      'AndhaDhun is on. One short buzz means keep going. A long buzz means stop. Keep using your cane. Tap anywhere and ask me anything.';
     speech.speak(welcome, { priority: 'normal' });
   };
 
@@ -496,6 +515,8 @@ export const App: React.FC = () => {
         serverLatencyMs={0}
         isOnline={isOnline}
         detectedObjects={detectedObjects}
+        guidanceState={guidanceState}
+        nearestBlocker={nearestBlocker}
         onSelectTool={async (tool: RouterTool, args?: Record<string, any>) => {
           await toolRuntime.execute({
             tool,
