@@ -1,93 +1,147 @@
 # SightLine 👁️🔊
 
-> **AI-Powered Environmental Awareness & Navigation for the Visually Impaired**  
-> Built for HackAttack 2026 (Sustainability & Social Impact Track).
+> **Voice-First AI Environmental Awareness & Spatial Navigation Assistant for the Visually Impaired**  
+> *Built for HackAttack 2026 (AMC Engineering College) — Track: Sustainability & Social Impact.*
 
-SightLine is a voice-first Progressive Web App (PWA) designed to turn any standard smartphone into a continuous sensory assistant. By pairing fast on-device computer vision with Google Gemini vision intelligence, SightLine translates the visual world into clear, spatial speech and haptic feedback.
+SightLine is an accessible Progressive Web App (PWA) that transforms any standard smartphone into a continuous spatial guide. By fusing low-latency on-device computer vision with Google Gemini 2.5 Flash cloud intelligence, SightLine translates the physical world into clear, directional speech, synthesised earcons, and urgent haptic alerts.
 
 ---
 
 ## 🌟 Key Features
 
-1. **Around Me (Object Awareness)**: Real-time on-device spatial announcements (direction + distance).
-2. **Read (Signs & Text)**: High-accuracy OCR for exit signs, room names, and warnings via Gemini Vision with offline Tesseract.js fallback.
-3. **Find Washroom (Flagship Demo)**: Scans surroundings for restroom signs, gender pictograms, and guides left/right/ahead.
-4. **Obstacle Alert (Safety Guard)**: Low-latency warning for fast-approaching or hazardous objects in the walking path with urgent haptics.
-5. **Universal Accessibility**: Giant 56px+ tactile buttons, high-contrast WCAG AA+ styling, and 100% voice-driven controls.
+| Mode | Capability | Tech / Latency | Audio & Spoken Cue |
+| :--- | :--- | :--- | :--- |
+| **Around Me** | Real-time object awareness in 5 spatial sectors | On-device COCO-SSD (~8 FPS, <80ms) | *"Chair slightly-left, near."* |
+| **Obstacle Alert** | Collision warnings with central corridor & size-growth tracking | On-device COCO-SSD + Haptics | Accelerating proximity beeps + *"Stop. Table ahead, close."* |
+| **Read Signs** | Directional OCR fusing printed text and directional arrows | Gemini VLM (Tesseract.js offline) | *"Exit, arrow points right."* |
+| **Find Destination** | Destination finder with HRTF 3D audio beacon | State machine + Web Audio PannerNode | Earcon chime + spatial ping panned to ear |
+| **Venue Navigation** | Turn-by-turn indoor guidance with step & compass dead reckoning | Pre-mapped JSON + Accelerometer | *"Walk about 20 steps. Turn left at corridor."* |
+| **Currency Reader** | Identifies Indian Rupee banknotes (₹10–₹2000) | Gemini VLM (Zero-guess fallback) | *"Five hundred rupee note."* |
+| **Waste Sorter** | Classifies wet, dry, recyclable, hazardous, e-waste + bin color | Configurable `waste-map.json` | Success chime + *"Plastic bottle. Dry waste, blue bin."* |
+| **Label Reader** | Reads product packaging, allergens first, strictly no guessing | Zero-guess safety rules | *"Allergens: Peanuts. Please verify medicine with a person."* |
+| **Hazard Scan** | Best-effort periodic scan for stairs, drop-offs, and open drains | 6s rate-limited cloud scan | Danger alert + *"Caution: stairs ahead."* |
+| **Emergency SOS** | Instant GPS coords + visual surroundings context | Geolocation + Visual context | Prefilled WhatsApp / SMS dispatch |
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 🏗️ Architecture
 
-```
-Phone Browser (PWA)
- ├─ Camera Stream (rear camera)
- ├─ Local Detection: TensorFlow.js COCO-SSD (~10 FPS on-device)
- ├─ Spatial Engine: Bounding Box → Direction + Distance + Danger Calculation
- ├─ Speech Out: SpeechSynthesis Priority Queue (Interrupt on Danger)
- ├─ Speech In: Web Speech Recognition Intent Router
- ├─ Haptics: Vibration API ([200, 100, 200] ms danger pulse)
- └─ On-Demand Server Proxy ──► Express API (Node.js/TypeScript)
-                                └─► Google Gemini 2.5 Flash Vision Model
-```
+```mermaid
+graph TD
+    User([User Voice & Gesture]) -->|Voice Commands / 56px Tactile Buttons| AppShell[App Shell & Priority Queue]
+    Camera[Phone Camera 1024px JPEG] --> LocalDetector[On-Device COCO-SSD ~8 FPS]
+    Camera --> CloudAPI[Express Server /api/analyze]
+    
+    subgraph OnDevice["On-Device Subsystem (< 80ms)"]
+        LocalDetector --> SpatialEngine[Spatial Direction & Distance Engine]
+        SpatialEngine --> ObstacleRule{Danger Collision?}
+        ObstacleRule -->|Yes| InterruptQueue[Priority Queue Danger Preemption]
+        ObstacleRule -->|No| Announcer[Anti-Chatter Deduplicator]
+        Pedometer[Accelerometer Peak Filter] --> VenueNavigator[Venue Step State Machine]
+        Compass[Orientation Manager] --> VenueNavigator
+        Tesseract[Tesseract.js OCR Offline Fallback]
+    end
+    
+    subgraph CloudVLM["Cloud Intelligence (1-2s Latency)"]
+        CloudAPI --> TaskRegistry{Unified Task Registry}
+        TaskRegistry -->|describe| GeminiVLM[Gemini 2.5 Flash]
+        TaskRegistry -->|read| GeminiVLM
+        TaskRegistry -->|find| GeminiVLM
+        TaskRegistry -->|currency| GeminiVLM
+        TaskRegistry -->|waste| GeminiVLM
+        TaskRegistry -->|label| GeminiVLM
+        TaskRegistry -->|hazard| GeminiVLM
+        TaskRegistry -->|verify_landmark| GeminiVLM
+        TaskRegistry -->|sos_context| GeminiVLM
+    end
 
-- **Frontend**: Vite, React 19, TypeScript, Tailwind CSS, `vite-plugin-pwa`
-- **Vision & ML**: `@tensorflow/tfjs`, `@tensorflow-models/coco-ssd`, `tesseract.js`
-- **Backend Proxy**: Node 20+, Express, `@google/genai`, TypeScript (`tsx`)
-- **Safety**: API keys are isolated exclusively to the backend proxy; images are processed in-memory and never persisted.
+    InterruptQueue --> SpeechSynth[SpeechSynthesis Priority Queue]
+    InterruptQueue --> Haptics[Vibration API]
+    InterruptQueue --> Earcons[Synthesised Web Audio Earcons]
+    VenueNavigator --> SpeechSynth
+    CloudAPI --> SpeechSynth
+    SpeechSynth --> Output([Audio & Haptic Feedback to User])
+```
 
 ---
 
-## 🚀 Quickstart
+## 🔒 Privacy & Safety Directives
+
+1. **Zero Persistent Storage:** Camera frames are processed strictly in ephemeral memory and discarded immediately. No images are saved to `localStorage`, `IndexedDB`, or written to cloud disk.
+2. **No Biometric Tracking:** SightLine explicitly disallows face identification, person tracking, or biometric logging.
+3. **Honest Uncertainty:** SightLine refuses to guess on blurry currency notes, faint labels, or unconfirmed checkpoints (*"I'm not sure"* rather than hallucinating).
+4. **Primary Mobility Disclaimer:** SightLine is an environmental awareness aid; it does **NOT** replace a white cane or guide dog.
+
+---
+
+## 🚀 Quickstart & Setup
 
 ### Prerequisites
 - Node.js 20+
 - npm 10+
-- A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/)
+- Google Gemini API key ([Google AI Studio](https://aistudio.google.com/))
 
-### 1. Installation
+### 1. Clone & Install
 ```bash
-git clone https://github.com/[MY_GITHUB_USERNAME]/sightline.git
-cd sightline
-npm install
+git clone https://github.com/ani18cs/hack-attack.git
+cd hack-attack
+npm ci
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure Environment
 ```bash
-# Backend setup
+# Server configuration
 cp server/.env.example server/.env
-# Edit server/.env and add your GEMINI_API_KEY
+# Edit server/.env: GEMINI_API_KEY=your_key_here
 
-# Frontend setup
+# Client configuration
 cp web/.env.example web/.env
 ```
 
 ### 3. Run Development Servers
 ```bash
+# Starts both web (port 5173) and server (port 8787)
 npm run dev
 ```
-- Web App: `http://localhost:5173`
-- Server Proxy: `http://localhost:8787`
 
-### 4. Testing on Mobile Device (HTTPS Required)
-Mobile camera and microphone require an HTTPS context. Expose the frontend using Cloudflare Tunnel or ngrok:
+### 4. Validate & Test
 ```bash
-# Cloudflare Tunnel
+# Run 100% of monorepo unit tests (41 web + 18 server tests)
+npm test
+
+# Validate the AMC Engineering College venue pack
+npm run venue:validate --workspace=web
+
+# Verify production build
+npm run build
+```
+
+---
+
+## 📱 Mobile HTTPS Testing (Zero-Setup)
+
+Mobile cameras and sensors require a secure HTTPS context. Expose your local port via Cloudflare Tunnel:
+```bash
+# Launch Cloudflare tunnel on web port
 cloudflared tunnel --url http://localhost:5173
 ```
-Scan the resulting HTTPS URL on your phone's browser.
+Open the generated HTTPS URL on your Android/iOS smartphone, tap the giant yellow button to unlock camera and audio permissions in a single gesture, and begin!
 
 ---
 
-## 📜 Team & Module Ownership
+## 📚 Documentation Index
 
-| Role | Lead | Focus | Dedicated Guide |
-|---|---|---|---|
-| **Role A** | App & Accessibility | App Shell, Giant UI, Speech Queue, Voice Intent Router, Haptics, PWA | [📖 Role A Guide](docs/TEAM_MEMBER_A_APP_A11Y.md) |
-| **Role B** | Vision | Camera, COCO-SSD, Spatial Calculation, Announcer Cooldown, Obstacle Alert | [📖 Role B Guide](docs/TEAM_MEMBER_B_VISION.md) |
-| **Role C** | AI & Server | Express Proxy, Gemini Prompts & Schemas, Read Mode, Find Washroom | [📖 Role C Guide](docs/TEAM_MEMBER_C_AI_SERVER.md) |
+- [📖 Honest Limitations & Safety Posture](docs/LIMITATIONS.md)
+- [🎬 4-Minute Hero Demo Script & Judge Q&A Playbook](docs/DEMO_SCRIPT.md)
+- [🚶 AMC Engineering College Venue Walk Survey Protocol](docs/VENUE_WALK.md)
+- [🧠 Single Source of Truth Knowledge Base](docs/KNOWLEDGE_BASE.md)
+- [👥 Role A (App & A11y) Guide](docs/TEAM_MEMBER_A_APP_A11Y.md)
+- [👥 Role B (Vision & Spatial) Guide](docs/TEAM_MEMBER_B_VISION.md)
+- [👥 Role C (AI & Server) Guide](docs/TEAM_MEMBER_C_AI_SERVER.md)
 
 ---
 
-## ⚠️ Important Note
-*SightLine is designed as a supplementary navigational and environmental awareness aid. It does not replace a white cane or guide dog.*
+## 🏆 Hackathon Details
+- **Event:** HackAttack 2026, AMC Engineering College (Autonomous), Bengaluru
+- **Track:** Sustainability & Social Impact
+- **Team:** Aniket Kumar Singh (Lead), Role B Lead, Role C Lead

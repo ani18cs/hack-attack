@@ -251,3 +251,43 @@ export interface AnalyzeResponse<T = any> {
 - [x] Server task registry and schema validation tested (14/14 unit tests pass).
 - [x] Judge diagnostics dashboard overlay operable.
 - [x] Full monorepo builds and tests pass cleanly.
+
+---
+
+## 9. Definition of Done (Part 2 Full System)
+
+- [x] **P0 Core Modes Wired**:
+  - `AroundMe`: continuous COCO-SSD announcements + on-demand scene description with confidence phrasing.
+  - `Read`: sign kind classification + directional arrow fusion + client-side Tesseract.js offline fallback.
+  - `Find`: pure state machine (`IDLE` -> `SCANNING` -> `FOUND` -> `GUIDING` -> `ARRIVED` | `NOT_FOUND`), COCO target fast-path, HRTF 3D audio beacon with distance scaling, accelerating proximity beeps, 20s timeout.
+  - `Confidence-Aware Phrasing`: plain text for high (>=0.6), "I think..." for medium (0.35–0.6), "I'm not sure, but..." for low (<0.35).
+  - `Earcon Rules`: hazard, found, error, and success tones briefly pause SpeechSynthesis to eliminate audio collisions.
+- [x] **P1/P2 Server Task Presets (`server/src/tasks/`)**:
+  - `currency`: Indian banknotes (₹10, 20, 50, 100, 200, 500, 2000) with honest illegible fallback.
+  - `waste`: Segregation (wet, dry, recyclable, hazardous, e-waste) mapped to bin colors via `waste-map.json`.
+  - `label`: Product name, printed expiry date, allergens read first; zero-guess safety; medicine verification disclaimer.
+  - `hazard`: Scans walking path for stairs, wet floors, drop-offs; 6s per-client rate limit; speaks high urgency with danger priority.
+  - `verify_landmark`: Matches context against expected checkpoint signs/text for venue navigation.
+  - `sos_context`: Generates <=20 word neutral scene description without biometric/personal tracking.
+- [x] **P1 Feature Modes Wired (`web/src/modes/`)**:
+  - `Currency`: Large denomination display with voice/tap "Scan Again".
+  - `Waste`: Bin color-coded cards + success chime confirmation.
+  - `Label`: Strict refusal to guess on blurry text + medicine warning.
+  - `Hazard`: Continuous 6s scan with spoken disclaimer on activation.
+  - `Sos`: High-accuracy GPS + visual surroundings context + WhatsApp / SMS prefilled dispatch.
+  - `Verbosity`: Quiet (hazards only), Normal, Detailed modes wired to voice and settings.
+- [x] **P1 Venue Map Pack & Voice Navigation (`web/src/venue/`)**:
+  - `amc-hackattack.json`: Pre-mapped AMC Engineering College routes with Zod schema (`npm run venue:validate`).
+  - `Localisation`: Voice landmark matching with Hindi/Kannada aliases, BarcodeDetector QR scan, and visual sign recognition.
+  - `Navigator`: Pure state machine with +/-25% step tolerance, turn nudges, and checkpoint sign verification.
+  - `Pedometer`: Low-pass dynamic filter with 250ms gait gate and calibration.
+  - `Compass`: Cross-platform heading, +/-30° turn evaluation, live spoken nudges, and reliability detection.
+  - `VENUE_WALK.md`: 30-minute teammate venue data collection guide.
+- [x] **Polish, A11y & Hardening**:
+  - Danger priority speech cancels in <50ms and interrupts all sounds.
+  - Offline listener announces: *"Offline. Obstacle detection still works."* Server modes gracefully degrade.
+  - Privacy audit confirmed: 0 image frames stored to localStorage/IndexedDB or logged on server.
+  - Spoken "Privacy" voice command added.
+  - Minimum 56px touch targets, WCAG AA high-contrast yellow/black palette, ARIA live regions.
+  - 100% test pass: 41 web tests (spatial, find, voice, navigator) and 18 server tests (registry, validation).
+
