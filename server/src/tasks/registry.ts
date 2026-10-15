@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { VisionTask, AnalyzeRequest } from '../types.js';
+import { askSchema, askGeminiSchema, buildAskPrompt, toAskSummary } from './ask.js';
 import { currencySchema, currencyGeminiSchema, buildCurrencyPrompt, toCurrencySummary } from './currency.js';
 import { describeSchema, describeGeminiSchema, buildDescribePrompt, toDescribeSummary } from './describe.js';
 import { findSchema, findGeminiSchema, buildFindPrompt, toFindSummary } from './find.js';
@@ -112,6 +113,16 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: sosContextSchema,
     geminiSchema: sosContextGeminiSchema,
     toSummary: (data) => toSosContextSummary(data),
+    implemented: true,
+  },
+
+  ask: {
+    task: 'ask',
+    systemPrompt: SHARED_SYSTEM_INSTRUCTION,
+    buildPrompt: buildAskPrompt,
+    schema: askSchema,
+    geminiSchema: askGeminiSchema,
+    toSummary: (data) => toAskSummary(data),
     implemented: true,
   },
 };

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { analyzeRouter } from './routes/analyze.js';
+import { askRouter } from './routes/ask.js';
 import { healthRouter } from './routes/health.js';
 import { ttsRouter } from './routes/tts.js';
 
@@ -55,6 +56,7 @@ app.use(express.json({ limit: '5mb' }));
 // Mount API routes
 app.use('/api', healthRouter);
 app.use('/api', analyzeRouter);
+app.use('/api', askRouter);
 app.use('/api', ttsRouter);
 
 // Global 404 handler

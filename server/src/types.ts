@@ -30,7 +30,8 @@ export type VisionTask =
   | 'label'
   | 'hazard'
   | 'verify_landmark'
-  | 'sos_context';
+  | 'sos_context'
+  | 'ask';
 
 export interface AnalyzeRequest {
   task: VisionTask;

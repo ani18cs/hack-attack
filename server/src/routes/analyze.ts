@@ -34,6 +34,7 @@ export const ALLOWED_TASKS: VisionTask[] = [
   'hazard',
   'verify_landmark',
   'sos_context',
+  'ask',
 ];
 
 // Per-task rate limit store: hazard max 1 request per 6s per client
@@ -50,6 +51,7 @@ const analyzeRequestSchema = z.object({
     'hazard',
     'verify_landmark',
     'sos_context',
+    'ask',
   ]),
   image: z.string().min(1, 'Image data is required.'),
   lang: z.string().optional().default('en'),

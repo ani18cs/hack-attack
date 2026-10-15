@@ -136,4 +136,15 @@ export const MOCK_FIXTURES: Record<VisionTask, MockFixture> = {
     },
     hazards: [],
   },
+
+  ask: {
+    ok: true,
+    summary: 'Yes, this is an accessible washroom door on your right.',
+    confidence: 0.93,
+    data: {
+      answer: 'Yes, this is an accessible washroom door on your right.',
+      confidence: 0.93,
+    },
+    hazards: [],
+  },
 };
