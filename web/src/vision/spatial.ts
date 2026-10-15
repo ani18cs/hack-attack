@@ -134,3 +134,5 @@ export function processSpatialObject(
     bbox: detection.bbox,
   };
 }
+
+export const calculateSpatialProperties = processSpatialObject;

@@ -106,6 +106,8 @@ export const KEYWORD_INTENTS: Record<string, string> = {
   'sos': 'SOS',
   'emergency': 'SOS',
   'help me': 'SOS',
+  'privacy': 'PRIVACY',
+  'privacy policy': 'PRIVACY',
 
   // Controls
   'start obstacle': 'OBSTACLE_ON',

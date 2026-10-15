@@ -222,6 +222,8 @@ class VoiceRecognizer {
         resolvedIntent = 'REPEAT';
       } else if (/\b(help|commands|options)\b/i.test(text)) {
         resolvedIntent = 'HELP';
+      } else if (/\b(privacy)\b/i.test(text)) {
+        resolvedIntent = 'PRIVACY';
       }
     }
 

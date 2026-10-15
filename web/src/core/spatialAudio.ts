@@ -159,3 +159,4 @@ class SpatialAudioBeacon {
 }
 
 export const spatialBeacon = new SpatialAudioBeacon();
+export const spatialAudio = spatialBeacon;

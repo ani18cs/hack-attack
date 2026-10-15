@@ -168,6 +168,13 @@ export const App: React.FC = () => {
         speech.speak(statusMessage, { priority: 'normal' });
         break;
 
+      case 'PRIVACY': {
+        const privMsg = 'Pictures are never saved. They are only sent when you ask.';
+        speech.speak(privMsg, { priority: 'normal' });
+        setStatusMessage(privMsg);
+        break;
+      }
+
       case 'UNKNOWN':
       default:
         speech.speak('Say help for options.', { priority: 'low' });
@@ -308,6 +315,7 @@ export const App: React.FC = () => {
         serverLatencyMs={serverLatencyMs}
         isOnline={isOnline}
         detectedObjects={detectedObjects}
+        currentMode={activeMode}
       />
 
       {activeMode === 'idle' && (

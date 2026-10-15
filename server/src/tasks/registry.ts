@@ -54,7 +54,7 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     implemented: true,
   },
 
-  // Part 2 scaffolded presets (marked implemented: false for Part 1)
+  // Part 1 & Part 2 fully implemented task presets
   currency: {
     task: 'currency',
     systemPrompt: SHARED_SYSTEM_INSTRUCTION,
@@ -62,7 +62,7 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: currencySchema,
     geminiSchema: currencyGeminiSchema,
     toSummary: (data) => toCurrencySummary(data),
-    implemented: false,
+    implemented: true,
   },
 
   waste: {
@@ -72,7 +72,7 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: wasteSchema,
     geminiSchema: wasteGeminiSchema,
     toSummary: (data) => toWasteSummary(data),
-    implemented: false,
+    implemented: true,
   },
 
   label: {
@@ -82,7 +82,7 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: labelSchema,
     geminiSchema: labelGeminiSchema,
     toSummary: (data) => toLabelSummary(data),
-    implemented: false,
+    implemented: true,
   },
 
   hazard: {
@@ -92,7 +92,7 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: hazardSchema,
     geminiSchema: hazardGeminiSchema,
     toSummary: (data) => toHazardSummary(data),
-    implemented: false,
+    implemented: true,
   },
 
   verify_landmark: {
@@ -101,8 +101,8 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     buildPrompt: buildVerifyLandmarkPrompt,
     schema: verifyLandmarkSchema,
     geminiSchema: verifyLandmarkGeminiSchema,
-    toSummary: (data) => toVerifyLandmarkSummary(data),
-    implemented: false,
+    toSummary: (data, req) => toVerifyLandmarkSummary(data, req),
+    implemented: true,
   },
 
   sos_context: {
@@ -112,6 +112,6 @@ export const TASK_REGISTRY: Record<VisionTask, TaskPreset> = {
     schema: sosContextSchema,
     geminiSchema: sosContextGeminiSchema,
     toSummary: (data) => toSosContextSummary(data),
-    implemented: false,
+    implemented: true,
   },
 };

@@ -1,24 +1,41 @@
 {
+  "_note": "Hackathon team must verify local campus municipal segregation rules before final demo.",
   "categories": {
     "wet": {
-      "bin": "Green bin (Organic/Wet)",
-      "items": ["food scraps", "fruit peel", "vegetable peel", "leftovers", "tea bags", "coffee grounds", "garden leaves", "egg shells"]
+      "bin": "Green bin",
+      "color": "green",
+      "categoryName": "Wet waste",
+      "items": ["food scraps", "vegetable peels", "fruit peels", "leftovers", "tea leaves", "coffee grounds", "flowers"]
     },
     "dry": {
-      "bin": "Blue bin (Dry/Non-recyclable)",
-      "items": ["paper towels", "tissue", "dust", "sanitary waste", "chips packet", "metallized foil pouch", "sweepings"]
+      "bin": "Blue bin",
+      "color": "blue",
+      "categoryName": "Dry waste",
+      "items": ["paper", "cardboard", "wrapper", "carton", "dry packaging", "sweepings"]
     },
     "recyclable": {
-      "bin": "Blue recycling bin",
-      "items": ["plastic bottle", "soda can", "glass bottle", "cardboard", "paper", "metal container", "clean foil", "tin can"]
+      "bin": "Blue bin",
+      "color": "blue",
+      "categoryName": "Recyclable",
+      "items": ["plastic bottle", "soda can", "glass jar", "tin", "milk pouch", "clean container"]
     },
     "hazardous": {
-      "bin": "Red bin (Hazardous)",
-      "items": ["battery", "paint can", "chemical bottle", "pesticide", "fluorescent bulb", "medicine", "syringe"]
+      "bin": "Red bin",
+      "color": "red",
+      "categoryName": "Hazardous waste",
+      "items": ["battery", "chemical bottle", "expired medicine", "sanitary waste", "fluorescent bulb", "paint", "syringe"]
     },
     "e-waste": {
-      "bin": "Black bin / E-waste drop",
-      "items": ["cables", "charger", "broken smartphone", "circuit board", "earphones", "remote control", "mouse"]
+      "bin": "Red/E-waste drop",
+      "color": "red",
+      "categoryName": "Electronic waste",
+      "items": ["cables", "charger", "broken smartphone", "circuit board", "earphones", "remote control"]
+    },
+    "unknown": {
+      "bin": "Check bin label",
+      "color": "gray",
+      "categoryName": "Uncertain",
+      "items": []
     }
   }
 }
