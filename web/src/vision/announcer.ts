@@ -1,4 +1,5 @@
 import { haptics } from '../core/haptics';
+import { settings } from '../core/settings';
 import { speech } from '../core/speech';
 import { DistanceBucket, SceneObject } from '../types';
 
@@ -8,9 +9,9 @@ interface AnnouncedState {
 }
 
 const DISTANCE_RANKS: Record<DistanceBucket, number> = {
-  'very close': 3,
+  'very-close': 3,
   'close': 2,
-  'a few steps away': 1,
+  'near': 1,
   'far': 0,
 };
 

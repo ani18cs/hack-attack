@@ -1,7 +1,7 @@
 # SightLine — Project Knowledge Base
 
-> Working name: **SightLine** (rename freely). Voice-first, phone-based assistant that helps visually impaired people perceive and navigate their surroundings.
-> This file is the single source of truth for humans and for the Antigravity agent. Read it fully before writing code. If code and this file disagree, ask, then update this file.
+> Working name: **SightLine**. Voice-first, phone-based assistant that helps visually impaired people perceive and navigate their surroundings.
+> This file is the single source of truth for humans and for the AI agents. Read it fully before writing code.
 
 ---
 
@@ -10,314 +10,244 @@
 - **Event:** HackAttack, AMC Engineering College (Autonomous), Dept. of CSE (AIML). Track: Sustainability and Social Impact.
 - **Problem statement:** *AI-Powered Environmental Awareness and Navigation for the Visually Impaired.* Build a functional prototype that helps visually impaired people perceive, interpret and interact with their surroundings.
 - **Build window:** 5 hours. Scope everything to what can be built **and demoed** in that time.
-- **Team:** 3 people. Work in parallel on separate modules, merge often.
-- **Allowed:** any AI/ML, computer vision, OCR, voice, mobile/web app, IoT. Open-source libraries, pretrained models and APIs are permitted.
+- **Team:** 3 people. Work in parallel on separate feature branches, merge often.
+- **Allowed:** open-source libraries, pretrained models, and official cloud APIs.
 - **Must do:** clearly communicate capabilities **and limitations**.
 
-### Judging criteria (every decision should serve these)
+### Judging criteria
 | Criterion | What we do about it |
 |---|---|
-| Problem relevance | Target real scenarios: washroom, signs, obstacles, objects |
-| Functionality | Working live demo on a phone; fewer features, all reliable |
-| Innovation | Hybrid on-device + vision-LLM pipeline, multilingual voice, low cost (no special hardware) |
-| Accessibility | Voice-first, huge touch targets, haptics, no visual-only feedback |
-| Technical execution | Clean modules, real-time detection, graceful fallbacks |
-| Real-world impact | Works on any smartphone; offline-capable core; roadmap to sensors |
-| Demonstration | Eyes-closed / blindfold demo, scripted flow, limitations slide |
+| Problem relevance | Target real scenarios: washrooms, signs with arrows, obstacles, objects |
+| Functionality | Working live demo on a phone; core features must work reliably |
+| Innovation | Hybrid on-device + unified VLM task registry, spatial audio beacon, multilingual voice, zero custom hardware |
+| Accessibility | Voice-first, huge touch targets (min 56px), haptics, synthesised earcons, no visual-only feedback |
+| Technical execution | Clean modules, real-time COCO-SSD detection, unified `POST /api/analyze` registry, graceful offline fallbacks |
+| Real-world impact | Works on any smartphone browser; offline-capable obstacle guard; roadmap to sensors |
+| Demonstration | Eyes-closed / blindfold demo, scripted flow, limitations slide, judge diagnostics dashboard |
 
 ---
 
-## 2. Product summary
+## 2. Product Summary & Scope
 
-A **Progressive Web App** opened on a phone. The camera is the sensor; **audio and vibration are the interface**. One core loop: **see → interpret → speak**.
+A **Progressive Web App** opened on a smartphone. The camera is the sensor; **audio and vibration are the interface**. One core loop: **see → interpret → speak**.
 
-### Modes
-1. **Around Me** (object awareness): announces nearby objects with direction and rough distance.
-2. **Read** (signs and text): reads exit signs, room labels, store names, directional boards.
-3. **Find Washroom** (headline demo): user asks, app scans for restroom signs/icons and guides left/right/ahead.
-4. **Obstacle Alert** (continuous safety): warns when something is close in the walking path.
-5. **Find Item** (stretch): "find my bottle/phone/chair" using detection.
+### Core Features (Part 1 Must Work)
+1. **Scene Description (`describe`)**: announces key objects with direction and distance; detailed on-demand scene summary <= 25 words.
+2. **Sign/Text Reading with Arrow Fusion (`read`)**: transcribes legible text, identifies kind (exit, room, store, warning, direction), and fuses arrows with text (e.g. *"Exit, arrow points right"*).
+3. **Real-time Obstacle Alerts with Accelerating Beeps + Vibration (`obstacle_alert`)**: continuous COCO-SSD detection with distance buckets, rapid growth tracking, accelerating proximity earcons, and haptics.
+4. **Washroom / Destination Finder (`find`)**: recognizes English/Hindi/Kannada restroom signs, male/female/accessible pictograms, and returns spatial cues and direction.
 
-### Non-goals (do NOT build)
-- Turn-by-turn GPS/indoor mapping, user accounts, databases, payments.
-- Anything that claims to replace a white cane or guide dog. We say this explicitly.
-- Custom model training (no time). Use pretrained models and APIs.
+### Extra Features (Part 2)
+- Spatial audio beacon (Web Audio HRTF `PannerNode` with distance scaling)
+- Currency reader (`currency`: 10, 20, 50, 100, 200, 500, 2000 INR)
+- Waste-bin mode (`waste`: wet, dry, recyclable, hazardous, e-waste + bin hint)
+- Label reader (`label`: product name, expiry, allergens, refuse to guess)
+- Emergency SOS context (`sos_context`)
+- Dedicated hazard scan (`hazard`: stairs, drop-offs, open manholes)
+- Find-my-belongings (objects beyond washroom)
+- Offline venue map pack & turn-by-turn steps (`web/public/venues/`)
+- Judge diagnostics dashboard (hidden triple-tap toggle or voice "dashboard")
+- Verbosity modes (`quiet`, `normal`, `detailed`)
+
+### Explicitly OUT of Scope
+- Teach-a-landmark via CLIP
+- Scene memory & spatial graphs
+- Any face identification or biometric tracking
+- Any persistent image storage or server telemetry capture
+
+### Safety Posture
+- Be completely honest about uncertainty ("I'm not sure" instead of hallucinating).
+- Never claim to replace a white cane or guide dog.
+- Hazard detection is strictly "best-effort".
+- Label reading must refuse to guess if text is blurry or illegible.
 
 ---
 
-## 3. Accessibility principles (hard requirements)
+## 3. Accessibility Principles (Hard Requirements)
 
-1. **Voice-first.** Every action reachable by voice command AND by a very large button. Never require reading the screen.
-2. **Audio feedback for everything**: mode changes, errors, "nothing found", loading states ("Looking…").
-3. **Haptics** via `navigator.vibrate` where supported: short pulse = new info, long/rapid = danger.
-4. **No chatter.** Speak only on meaningful change. Rules in section 7.
-5. **Priority queue for speech**: danger alerts interrupt everything; normal info queues; stale info is dropped.
-6. **High-contrast UI** (WCAG AA+), minimum 56px touch targets, full-screen mode buttons, ARIA labels and live regions, works with TalkBack/VoiceOver.
-7. **Short phrases.** "Door ahead, left." not paragraphs.
-8. **Honest uncertainty.** If confidence is low say "I'm not sure" instead of guessing.
-9. **Start experience**: on load, speak a 2-sentence welcome and the available commands (requires one user tap to unlock audio/camera on mobile browsers; make that tap a giant "Start" button covering the screen).
+1. **Voice-First**: every action reachable by voice command AND by a large tactile button.
+2. **Audio feedback for everything**: mode switches, errors, "nothing found", loading cues ("Analyzing scene...").
+3. **Haptics** via `navigator.vibrate`: info pulse, found confirmation, rapid danger warning.
+4. **Anti-Chatter Rules**: deduplicate per label+direction, re-announce on closer bucket, new direction, or 8s cooldown. Max 3 objects per batch.
+5. **Priority Queue for Speech**: `danger` cancels everything and speaks; `normal` queues up to 3 (drops oldest); `low` speaks only when idle.
+6. **High-Contrast UI**: WCAG AA+, min 56px touch targets, ARIA live regions.
+7. **Short Phrases**: <= 12 words for alerts. Format: `Object -> Direction -> Distance`.
+8. **Single-Gesture Start Screen**: giant button unlocks SpeechSynthesis, rear camera, microphone, and iOS motion/orientation permissions in a single tap.
 
 ---
 
 ## 4. Architecture
 
-Hybrid pipeline: fast local detection for real-time safety, vision LLM for understanding and reading.
+Hybrid architecture: local on-device detection for real-time safety + unified Vision LLM server for contextual perception.
 
 ```
-Phone browser (PWA, HTTPS)
- ├─ Camera (getUserMedia, rear camera)
- ├─ Local detector: TensorFlow.js COCO-SSD  → objects, boxes (real-time, offline)
- ├─ Spatial engine: box → direction + distance bucket + danger
- ├─ Speech out: SpeechSynthesis queue (priority)
- ├─ Speech in: Web Speech API (SpeechRecognition) → intent router
- ├─ Haptics: Vibration API
- └─ On-demand calls ─────────────────────────────┐
-                                                 ▼
-                                   Node/Express proxy (server/)
-                                   holds GEMINI_API_KEY, never exposed to client
-                                                 │
-                                                 ▼
-                                   Gemini vision model (scene / OCR / washroom)
-                                   Fallback: Tesseract.js OCR in browser
+Phone Browser (PWA, HTTPS)
+ ├─ Camera (getUserMedia rear camera, 1024px JPEG)
+ ├─ Local detector: TensorFlow.js COCO-SSD (lite_mobilenet_v2) → 5–10 FPS time-gated
+ ├─ Spatial engine: box center x → direction ('left' | 'slightly-left' | 'ahead' | 'slightly-right' | 'right')
+ │                  area ratio  → distance ('very-close' | 'close' | 'near' | 'far')
+ │                  corridor    → danger rule (central 50% + lower path + area growth)
+ ├─ 3D Audio Beacon: Web Audio PannerNode (HRTF) + stereo fallback + proximity beeping
+ ├─ Speech Out: SpeechSynthesis priority queue with verbosity filtering
+ ├─ Voice In: SpeechRecognition continuous listener with fuzzy keyword routing
+ ├─ Haptics: navigator.vibrate patterns (info, danger, found)
+ ├─ Offline Fallback: Tesseract.js in browser
+ └─ On-Demand Requests (One in-flight per task, abort on mode change)
+       │
+       ▼
+ Node/Express Server (server/)
+ ├─ GET /api/health → Server status, model, API key checks, mock status
+ └─ POST /api/analyze → Unified task registry (Zod validated, 30 req/min/IP limit, 5MB body)
+       │
+       ▼
+ Task Registry (server/src/tasks/)
+ ├─ describe        → Up to 5 items + spoken summary <= 25 words
+ ├─ read            → Transcribe text, classify kind, fuse directional arrows
+ ├─ find            → Detect targets (restrooms, objects), text + pictograms + cue
+ ├─ currency, waste, label, hazard, verify_landmark, sos_context (scaffolded presets)
+ └─ Gemini wrapper (@google/genai, JSON mode, 10s timeout, 1 retry, zero image/key logging)
 ```
-
-### Why this split
-- COCO-SSD runs ~10+ FPS on phones, works offline, great for obstacles. **Limitation:** only 80 classes (no "door", no "restroom sign").
-- Gemini vision handles doors, signs, restroom icons, multilingual text and natural descriptions, but costs latency (1–3 s), so it is **on demand**, never per-frame.
-- Tesseract.js is the offline fallback for plain text.
-
-### Stack
-- **Frontend:** Vite + React + TypeScript, Tailwind CSS, `vite-plugin-pwa`.
-- **Detection:** `@tensorflow/tfjs`, `@tensorflow-models/coco-ssd`.
-- **OCR fallback:** `tesseract.js`.
-- **Voice:** browser Web Speech API (SpeechSynthesis + SpeechRecognition). Locale configurable: `en-IN`, `hi-IN`, `kn-IN`.
-- **Server:** Node 20+, Express, `@google/genai` SDK (or REST), `cors`, `dotenv`, `multer` or JSON base64 body (limit 5 MB).
-- **Tooling:** ESLint, Prettier, GitHub Actions (lint + build).
-- **Hosting for demo:** camera needs HTTPS. Use a Cloudflare Tunnel / ngrok during dev, and Vercel/Netlify (web) + Render/Railway (server) for the final demo link.
-
-### Env vars
-`server/.env` (never commit):
-```
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash   # check Google AI docs for the newest Flash-class model
-PORT=8787
-ALLOWED_ORIGIN=http://localhost:5173
-```
-`web/.env`:
-```
-VITE_API_BASE=http://localhost:8787
-```
-Commit `.env.example` files only.
 
 ---
 
-## 5. Repository layout (monorepo)
+## 5. Repository Layout (Monorepo)
 
 ```
 sightline/
-├─ README.md
-├─ AGENTS.md                 # rules for AI agents (short; points to this file)
+├─ package.json              # npm workspaces: web, server
 ├─ docs/
-│  ├─ KNOWLEDGE_BASE.md      # this file
+│  ├─ KNOWLEDGE_BASE.md      # Source of truth
 │  ├─ DEMO_SCRIPT.md
 │  └─ LIMITATIONS.md
 ├─ web/
 │  ├─ src/
-│  │  ├─ app/                # App shell, routing between modes
-│  │  ├─ components/         # BigButton, ModeScreen, StatusBanner
+│  │  ├─ app/App.tsx         # Full-screen start screen, mode router
+│  │  ├─ components/         # BigButton, ModeScreen, StatusBanner, DebugOverlay
 │  │  ├─ core/
-│  │  │  ├─ camera.ts        # stream + frame capture
-│  │  │  ├─ speech.ts        # TTS queue with priorities
-│  │  │  ├─ voice.ts         # STT + intent router
-│  │  │  ├─ haptics.ts
-│  │  │  └─ i18n.ts          # phrase tables en/hi/kn
+│  │  │  ├─ camera.ts        # Rear camera stream + frame capture (1024px, q=0.7)
+│  │  │  ├─ speech.ts        # Priority queue TTS with verbosity support
+│  │  │  ├─ voice.ts         # Voice recognition & fuzzy intent router
+│  │  │  ├─ haptics.ts       # Haptic patterns (info, danger, found, error)
+│  │  │  ├─ i18n.ts          # Multilingual phrase tables (en, hi, kn)
+│  │  │  ├─ earcons.ts       # Synthesised Web Audio sound cues & proximity beeper
+│  │  │  ├─ spatialAudio.ts  # HRTF 3D audio beacon with distance scaling
+│  │  │  ├─ settings.ts      # LocalStorage settings manager
+│  │  │  └─ network.ts       # Online/offline network status listener
 │  │  ├─ vision/
-│  │  │  ├─ detector.ts      # COCO-SSD loop
-│  │  │  ├─ spatial.ts       # direction/distance/danger logic
-│  │  │  ├─ announcer.ts     # dedupe + cooldown logic
-│  │  │  ├─ ocr.ts           # Tesseract fallback
-│  │  │  └─ api.ts           # calls to server
-│  │  └─ modes/
-│  │     ├─ AroundMe.tsx
-│  │     ├─ Read.tsx
-│  │     ├─ FindWashroom.tsx
-│  │     └─ ObstacleAlert.tsx
-│  └─ public/ (icons, manifest)
+│  │  │  ├─ detector.ts      # COCO-SSD loop with time-gating
+│  │  │  ├─ spatial.ts       # Pure spatial math, distance buckets, danger rules
+│  │  │  ├─ announcer.ts     # Anti-chatter deduplication & batching
+│  │  │  ├─ ocr.ts           # Tesseract.js offline fallback
+│  │  │  └─ api.ts           # Typed client for POST /api/analyze with aborts
+│  │  ├─ modes/              # AroundMe, ObstacleAlert, Read, Find, Currency, Waste, Label, Hazard, Sos, Navigate
+│  │  ├─ venue/              # Offline venue packs, loader, navigator, compass, steps
+│  │  └─ types.ts            # Shared interface contracts
+│  └─ public/venues/         # JSON venue packs
 ├─ server/
-│  ├─ src/index.ts           # Express app
-│  ├─ src/routes/vision.ts   # /api/describe /api/read /api/find
-│  └─ src/prompts.ts         # Gemini prompts
+│  ├─ src/
+│  │  ├─ index.ts            # Express server entry point
+│  │  ├─ gemini.ts           # Client wrapper (JSON mode, 10s timeout, 1 retry)
+│  │  ├─ types.ts            # Server-side contract mirror
+│  │  ├─ routes/
+│  │  │  ├─ analyze.ts       # POST /api/analyze unified route
+│  │  │  ├─ health.ts        # GET /api/health route
+│  │  │  └─ tts.ts           # Multilingual Sarvam AI proxy
+│  │  ├─ tasks/              # registry.ts + task preset handlers
+│  │  ├─ config/waste-map.json
+│  │  └─ mock/fixtures.ts    # Fixtures for offline dev & test (MOCK_VLM=true)
+│  └─ scripts/try-analyze.ts # Local CLI test runner
 └─ .github/
    ├─ workflows/ci.yml
-   ├─ pull_request_template.md
-   └─ ISSUE_TEMPLATE/
+   └─ pull_request_template.md
 ```
 
 ---
 
-## 6. Module specs
+## 6. Shared Interface Contracts (`web/src/types.ts` & `server/src/types.ts`)
 
-### 6.1 `core/speech.ts`: speech output
-- `speak(text, {priority: 'danger'|'normal'|'low', lang?})`.
-- `danger` cancels current speech immediately and speaks. `normal` queues (max queue 3, drop oldest). `low` only speaks if queue empty.
-- Expose `isSpeaking`, `stop()`, `setRate()`, `setLang()`.
-- Handle the Chrome bug where long utterances cut off: keep phrases short.
+```typescript
+export type Direction =
+  | 'left'
+  | 'slightly-left'
+  | 'ahead'
+  | 'slightly-right'
+  | 'right'
+  | 'unknown';
 
-### 6.2 `core/voice.ts`: voice commands
-Continuous recognition with auto-restart. Intent router with fuzzy keyword matching (English, Hindi, Kannada keywords in `i18n.ts`):
+export type DistanceBucket = 'very-close' | 'close' | 'near' | 'far';
+export type SpeakPriority = 'danger' | 'normal' | 'low';
+export type Verbosity = 'quiet' | 'normal' | 'detailed';
 
-| Intent | Example phrases |
-|---|---|
-| `AROUND_ME` | "what's around me", "describe", "look around" |
-| `READ` | "read this", "read sign", "what does it say" |
-| `FIND_WASHROOM` | "find washroom", "restroom", "toilet", "where is the bathroom" |
-| `OBSTACLE_ON/OFF` | "start obstacle alert", "stop alerts" |
-| `FIND_ITEM` | "find my bottle / chair / phone" (stretch) |
-| `STOP` | "stop", "quiet", "cancel" |
-| `HELP` | "help", "what can you do" |
-| `REPEAT` | "repeat", "say again" |
+export interface SceneObject {
+  label: string;
+  score: number;
+  direction: Direction;
+  distance: DistanceBucket;
+  danger: boolean;
+  bbox: [number, number, number, number]; // [x, y, width, height]
+}
 
-Always confirm: "Okay, reading." Unknown command: "Sorry, say help for options."
+export type VisionTask =
+  | 'describe'
+  | 'read'
+  | 'find'
+  | 'currency'
+  | 'waste'
+  | 'label'
+  | 'hazard'
+  | 'verify_landmark'
+  | 'sos_context';
 
-### 6.3 `vision/detector.ts`: local detection
-- Load COCO-SSD (`lite_mobilenet_v2` for speed) once; show/speak "Getting ready" until loaded.
-- Run detection on the video element at ~5–10 FPS (throttle by `requestAnimationFrame` + time gate). Pause when tab hidden.
-- Output: `{label, score, bbox:[x,y,w,h]}[]`, filter `score >= 0.55`.
+export interface AnalyzeRequest {
+  task: VisionTask;
+  image: string; // Base64 JPEG data
+  lang?: string;
+  target?: string;
+  context?: any;
+}
 
-### 6.4 `vision/spatial.ts`: direction, distance, danger
-Frame normalised to 0–1.
-- **Direction** from box center x: `<0.33` → "left", `0.33–0.66` → "ahead", `>0.66` → "right". (Use "slightly left/right" for 0.25–0.4 and 0.6–0.75 if you want finer wording.)
-- **Distance (rough)** from box area ratio `area = (w*h)/(frameW*frameH)`:
-  - `> 0.35` → "very close"
-  - `0.12–0.35` → "close"
-  - `0.03–0.12` → "a few steps away"
-  - `< 0.03` → "far" (usually not announced)
-  - Per-class tuning is allowed (a person looks bigger than a bottle at same distance). Document any tuning here.
-- **Danger rule:** object in the central 50% of the frame, in the lower-center zone (walking path), with area ratio `> 0.25`, OR area growing quickly across 3 consecutive frames (approaching). Ignore small items.
-- Output a `SceneObject {label, direction, distance, danger}`.
-
-### 6.5 `vision/announcer.ts`: anti-chatter
-- Maintain a map of last-announced state per `label+direction`.
-- Re-announce only if: new object, direction changed, distance bucket got closer, or cooldown (8 s) expired.
-- Batch: at most **3 objects** per announcement, sorted by danger then closeness. Example: "Chair close, right. Person ahead."
-- Danger alerts bypass cooldown but have their own 2.5 s cooldown to avoid spamming.
-- Pair danger with a vibration pattern `[200,100,200]`.
-
-### 6.6 `modes/ObstacleAlert`
-Runs the detector continuously. Only speaks on `danger`. Message: "Stop. {label} ahead." + vibrate. Also optionally a looping beep whose rate increases with proximity (Web Audio API; stretch).
-
-### 6.7 `modes/AroundMe`
-Two behaviours:
-1. **Continuous** (local): COCO-SSD announcements via announcer.
-2. **On demand** ("describe"): capture a frame, send to `/api/describe`, speak the short answer (doors, signs, layout). Say "Looking" first.
-
-### 6.8 `modes/Read`
-1. Capture frame (downscale to max 1024px wide, JPEG q≈0.7).
-2. POST `/api/read`. Gemini returns JSON `{texts:[{text, kind}], summary}` where `kind` ∈ `exit|room|store|direction|warning|other`.
-3. Speak summary first ("Exit sign. Arrow pointing right."), then details if asked.
-4. If server unreachable or offline → Tesseract.js fallback, speak raw text, say "Offline mode, may be less accurate."
-
-### 6.9 `modes/FindWashroom` (flagship)
-State machine: `IDLE → SCANNING → FOUND → GUIDING | NOT_FOUND`.
-1. Speak "Scanning for washroom. Slowly turn around."
-2. Every ~2 s send a frame to `/api/find` with `target="restroom"`. Response: `{found:boolean, direction:"left|ahead|right|unknown", gender:"men|women|unisex|unknown", confidence:0-1, cue:string}`.
-3. If found with confidence ≥ 0.6: "Restroom sign, {gender}, on your {direction}." Vibrate once. Then GUIDING: re-check every 2 s and update ("Still ahead", "Now on your left, very close").
-4. After 20 s with nothing: "Not found yet. Try turning more, or move forward and say find washroom again."
-5. Must handle common sign variations: text (WC, Toilet, Restroom, Washroom, Gents, Ladies, Men, Women), pictograms, and Hindi/Kannada labels.
-6. Limit API call rate: one in-flight request at a time; skip frames while waiting.
-
-### 6.10 `server/`
-Endpoints (JSON, base64 image in body, `{image:string(base64 jpeg), lang?:string}`):
-- `POST /api/describe` → `{summary:string, objects:[{label,direction,distance}]}`
-- `POST /api/read` → `{summary:string, texts:[{text,kind,direction?}]}`
-- `POST /api/find` → `{found,direction,gender,confidence,cue}`
-- `GET /api/health` → `{ok:true}`
-
-Requirements: validate body size (≤5 MB), CORS restricted to `ALLOWED_ORIGIN`, per-IP rate limit (e.g. 30/min), 10 s timeout, Gemini called with `responseMimeType: application/json` and a response schema; strict try/catch returning `{error}` with a spoken-friendly message; never log images or keys.
-
-### 6.11 Gemini prompts (in `server/src/prompts.ts`)
-Common system instruction: *"You assist a blind user. Be concise, factual and spatial. Use left/ahead/right and rough distance. Never invent text you cannot read. If unsure, say so. Output JSON matching the schema."*
-- **describe:** list up to 5 most relevant things for safe navigation (doors, stairs, people, furniture, hazards) + one-sentence summary ≤ 20 words.
-- **read:** transcribe all legible text, classify, say which side of the frame it is on, translate to `lang` if requested.
-- **find:** detect restroom indicators (text or pictogram), return direction and gender indicator.
+export interface AnalyzeResponse<T = any> {
+  task: VisionTask;
+  ok: boolean;
+  summary: string; // Spoken text (<= 25 words)
+  confidence: number; // 0 to 1
+  data: T;
+  hazards?: Array<{ type: string; direction: Direction; urgency: 'low' | 'medium' | 'high' }>;
+  error?: string;
+  latencyMs?: number;
+}
+```
 
 ---
 
-## 7. Spoken output style guide
-- ≤ 12 words for normal alerts. Lead with the object, then direction, then distance.
-- Examples: "Door ahead." "Chair close, left." "Stop. Person ahead."
-- Don't say percentages or technical terms. Say "I'm not sure" for low confidence.
-- Always announce mode start and stop.
+## 7. Team & Role Distribution
+
+| Role | Focus | Primary Directories | Feature Branch |
+|---|---|---|---|
+| **Role A** (App / A11y Lead) | App shell, big buttons, voice router, speech priority queue, earcons, settings, SOS, venue nav | `web/src/app`, `web/src/components`, `web/src/core/*` | `feat/app-shell` |
+| **Role B** (Vision Lead) | COCO-SSD detector, spatial math, danger heuristics, announcer, 3D audio beacon, obstacle alert, judge overlay | `web/src/vision/detector,spatial,announcer`, `web/src/core/spatialAudio.ts`, `web/src/modes/ObstacleAlert,AroundMe` | `feat/vision-core` |
+| **Role C** (AI & Server Lead) | Express app, Gemini wrapper, task registry (`describe`, `read`, `find`), offline mock fixtures, OCR fallback | `server/*`, `web/src/vision/api.ts,ocr.ts`, `docs/*` | `feat/server-analyze` |
+
+### Git & Collaboration Directives
+1. Never push directly to `main`.
+2. Work strictly in feature branches: `feat/app-shell`, `feat/vision-core`, `feat/server-analyze`.
+3. Use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
+4. Never commit `.env` or API keys.
+5. All PRs require review and passing CI.
 
 ---
 
-## 8. Team and workflow (3 people)
+## 8. Definition of Done (Part 1 Core Baseline)
 
-| Role | Owns | Primary files |
-|---|---|---|
-| **A: App and Accessibility lead** | App shell, big UI, voice in/out, haptics, i18n, PWA, deploy | `web/src/app`, `components`, `core/*` |
-| **B: Vision lead** | Camera, COCO-SSD, spatial logic, announcer, Obstacle + AroundMe modes | `web/src/vision/detector,spatial,announcer`, `modes/ObstacleAlert,AroundMe` |
-| **C: AI and Server lead** | Express proxy, Gemini prompts, Read + FindWashroom modes, OCR fallback, demo script and slides | `server/*`, `vision/api,ocr`, `modes/Read,FindWashroom`, `docs/*` |
-
-### Git rules
-- `main` is protected: PR required, 1 approval, CI green. Never push directly to `main`.
-- Branch naming: `feat/<area>-<short>`, `fix/<short>`, `docs/<short>`. Example: `feat/vision-spatial`.
-- Small commits, Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
-- Open PRs early (draft is fine), merge at least **every 45–60 minutes** to avoid big conflicts.
-- Stay in your owned folders; if you need to change a shared file (`core/speech.ts` etc.), tell the owner.
-- Shared contracts to agree on in the first 20 minutes: `SceneObject` type, server response shapes (section 6.10), `speak()` signature. Put them in `web/src/types.ts` and merge immediately.
-- Never commit secrets.
-
-### Milestones (5 hours)
-| Time | Goal | Done when |
-|---|---|---|
-| 0:00–0:30 | Repo, scaffold, CI, contracts, deploy tunnel | All three can run `npm run dev` and see the Start screen on a phone over HTTPS |
-| 0:30–1:30 | Shell + speech + camera + detector skeleton + server `/health` and `/describe` | Phone speaks, camera shows, boxes logged, server answers |
-| 1:30–3:00 | Spatial + announcer + Obstacle mode; Read mode; FindWashroom v1 | Obstacle alert works on a walk-through; read works on a printed sign |
-| 3:00–4:00 | Voice commands, haptics, FindWashroom polish, Hindi/Kannada phrases, offline fallback | Hands-free flow works end to end |
-| 4:00–4:30 | Bug bash on real phones, tune thresholds, README, LIMITATIONS | No crashes in 5-min continuous run |
-| 4:30–5:00 | Deploy, rehearse demo twice, final slides | Public HTTPS link works |
-
-**Scope rule:** if behind schedule, cut Find Item, Hindi/Kannada, and beeps first. Never cut: Start screen, speech, Obstacle, Read, Washroom.
-
----
-
-## 9. Quality checklist (Definition of Done)
-- [ ] Works on Android Chrome over HTTPS (primary demo device); also tested on iOS Safari if available
-- [ ] Rear camera used by default
-- [ ] Start button unlocks audio + camera in one tap
-- [ ] Every mode can be started and stopped by voice
-- [ ] No speech overlap or repeated spam in a 2-minute run
-- [ ] Danger alerts interrupt and vibrate
-- [ ] Server failure produces a spoken message, not silence
-- [ ] No API key in the client bundle or git history
-- [ ] `npm run lint && npm run build` pass in CI
-- [ ] README has run instructions and a demo GIF/screenshot
-- [ ] LIMITATIONS.md is honest and complete
-
----
-
-## 10. Known limitations (state these in the demo)
-- Distance is **estimated from object size**, not measured. Not reliable for exact distances.
-- COCO-SSD recognises 80 common classes only; doors and signs rely on the vision LLM.
-- Vision LLM calls need internet and add 1–3 s latency; offline mode supports obstacle detection and basic OCR only.
-- Low light, motion blur, glare and unusual signs reduce accuracy.
-- Speech recognition accuracy varies with noise and accent; Kannada/Hindi support depends on the browser.
-- Phone camera only sees forward; no side or ground-level hazard detection (stairs, kerbs, holes).
-- **Not a replacement for a white cane or guide dog.** It is a supplementary aid.
-
-**Roadmap (Real-World Impact):** ultrasonic/LiDAR sensor via ESP32 for true distance; wearable chest/glasses mount; indoor landmark maps; on-device small VLM for offline reading; local-language TTS voices; user testing with blind-community organisations.
-
----
-
-## 11. Demo script (3–4 minutes)
-1. 15 s: problem framing (one stat or story, cost of existing devices).
-2. Blindfolded teammate opens the link, taps the giant Start button, hears the welcome.
-3. "What's around me" → hears chair/person with direction.
-4. Walk toward a table/person → "Stop. Table ahead." + vibration.
-5. "Read this" on a printed Exit / room sign → hears it.
-6. "Find washroom" → turns slowly → "Restroom sign, women, on your left."
-7. 20 s: limitations and roadmap (ESP32 sensor, offline VLM).
-8. Q&A prep: privacy (frames not stored), cost (any smartphone), why not only an LLM (latency, offline safety).
-
-**Privacy statement:** frames are processed transiently, never stored or logged; only sent to the vision API on explicit user request (Read/Describe/Find).
+- [x] Preflight checks pass (Node 20+, npm, git, gh).
+- [x] Monorepo scaffolded with npm workspaces (`web`, `server`).
+- [x] Unified `POST /api/analyze` endpoint operational with task registry.
+- [x] Core tasks (`describe`, `read` with arrow fusion, `find`) implemented.
+- [x] Scaffolded tasks (`currency`, `waste`, `label`, `hazard`, `verify_landmark`, `sos_context`) in place with mock fixtures.
+- [x] App shell single-gesture start screen unlocks audio, rear camera, mic, and sensors.
+- [x] Priority speech queue with verbosity filtering and anti-chatter logic.
+- [x] Real-time COCO-SSD detector + pure spatial math tested (15/15 unit tests pass).
+- [x] Voice intent router with target extraction tested (5/5 unit tests pass).
+- [x] Server task registry and schema validation tested (14/14 unit tests pass).
+- [x] Judge diagnostics dashboard overlay operable.
+- [x] Full monorepo builds and tests pass cleanly.

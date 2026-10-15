@@ -1,7 +1,6 @@
 import { VoiceIntent } from '../types';
 import { KEYWORD_INTENTS } from './i18n';
 
-// Type declarations for Web Speech API
 interface SpeechRecognitionEventLike {
   results: {
     length: number;
@@ -34,7 +33,13 @@ declare global {
   }
 }
 
-export type IntentHandler = (intent: VoiceIntent, transcript: string) => void;
+export interface RoutedIntent {
+  intent: VoiceIntent;
+  target?: string;
+  raw: string;
+}
+
+export type IntentHandler = (result: RoutedIntent) => void;
 
 class VoiceRecognizer {
   private recognition: SpeechRecognitionInstance | null = null;
@@ -67,7 +72,8 @@ class VoiceRecognizer {
         const lastIndex = event.results.length - 1;
         if (lastIndex >= 0) {
           const transcript = event.results[lastIndex][0].transcript.trim().toLowerCase();
-          this.routeIntent(transcript);
+          const routed = this.routeIntent(transcript);
+          this.intentHandlers.forEach((handler) => handler(routed));
         }
       };
 
@@ -76,7 +82,6 @@ class VoiceRecognizer {
       };
 
       this.recognition.onend = () => {
-        // Auto-restart if we are still meant to be running
         if (this.running) {
           this.restartTimeout = setTimeout(() => {
             if (this.running && this.recognition) {
@@ -157,38 +162,74 @@ class VoiceRecognizer {
     return this.running;
   }
 
-  public routeIntent(transcript: string): VoiceIntent {
+  public routeIntent(transcript: string): RoutedIntent {
+    const text = transcript.trim().toLowerCase();
     let resolvedIntent: VoiceIntent = 'UNKNOWN';
+    let target: string | undefined = undefined;
 
-    // Check fuzzy match against KEYWORD_INTENTS
-    for (const [phrase, intentName] of Object.entries(KEYWORD_INTENTS)) {
-      if (transcript.includes(phrase)) {
-        resolvedIntent = intentName as VoiceIntent;
-        break;
+    // Check target extraction for FIND ("find my bottle", "find washroom", "find chair")
+    const findMatch = text.match(/\b(?:find|where is|locate|look for)\s+(?:my\s+|the\s+|a\s+)?([a-z0-9_\-\s]+)/i);
+    if (findMatch && findMatch[1]) {
+      const extracted = findMatch[1].trim();
+      if (!/^(?:what|how|why)$/i.test(extracted)) {
+        resolvedIntent = 'FIND';
+        target = extracted;
       }
     }
 
-    // Specific regex checks for edge cases
+    // Check target extraction for NAVIGATE ("take me to lab", "navigate to entrance")
+    const navMatch = text.match(/\b(?:take me to|navigate to|go to|lead me to)\s+(?:my\s+|the\s+|a\s+)?([a-z0-9_\-\s]+)/i);
+    if (navMatch && navMatch[1]) {
+      resolvedIntent = 'NAVIGATE';
+      target = navMatch[1].trim();
+    }
+
+    // Check keyword dictionary (sorted by longest phrase first to avoid prefix shadowing)
     if (resolvedIntent === 'UNKNOWN') {
-      if (/\b(washroom|restroom|toilet|bathroom|loo|wc)\b/i.test(transcript)) {
-        resolvedIntent = 'FIND_WASHROOM';
-      } else if (/\b(around|surroundings|describe|environment)\b/i.test(transcript)) {
-        resolvedIntent = 'AROUND_ME';
-      } else if (/\b(read|text|sign|board|what does it say)\b/i.test(transcript)) {
-        resolvedIntent = 'READ';
-      } else if (/\b(obstacle|danger|walk|alert)\b/i.test(transcript)) {
-        resolvedIntent = 'OBSTACLE_ON';
-      } else if (/\b(stop|quiet|cancel|silence)\b/i.test(transcript)) {
-        resolvedIntent = 'STOP';
-      } else if (/\b(help|commands|options)\b/i.test(transcript)) {
-        resolvedIntent = 'HELP';
-      } else if (/\b(repeat|again)\b/i.test(transcript)) {
-        resolvedIntent = 'REPEAT';
+      const sortedKeywords = Object.entries(KEYWORD_INTENTS).sort(
+        (a, b) => b[0].length - a[0].length
+      );
+      for (const [phrase, intentName] of sortedKeywords) {
+        if (text.includes(phrase)) {
+          resolvedIntent = intentName as VoiceIntent;
+          break;
+        }
       }
     }
 
-    this.intentHandlers.forEach((handler) => handler(resolvedIntent, transcript));
-    return resolvedIntent;
+    // Secondary regex matching
+    if (resolvedIntent === 'UNKNOWN') {
+      if (/\b(washroom|restroom|toilet|bathroom|loo|wc)\b/i.test(text)) {
+        resolvedIntent = 'FIND';
+        target = 'washroom';
+      } else if (/\b(currency|money|rupee|note|cash)\b/i.test(text)) {
+        resolvedIntent = 'CURRENCY';
+      } else if (/\b(waste|bin|garbage|trash|dustbin)\b/i.test(text)) {
+        resolvedIntent = 'WASTE';
+      } else if (/\b(label|expiry|allergens|product|ingredients)\b/i.test(text)) {
+        resolvedIntent = 'LABEL';
+      } else if (/\b(hazard|stairs|curb|hole|tripping)\b/i.test(text)) {
+        resolvedIntent = 'HAZARD';
+      } else if (/\b(sos|emergency|help me)\b/i.test(text)) {
+        resolvedIntent = 'SOS';
+      } else if (/\b(quiet)\b/i.test(text)) {
+        resolvedIntent = 'VERBOSITY_QUIET';
+      } else if (/\b(detailed)\b/i.test(text)) {
+        resolvedIntent = 'VERBOSITY_DETAILED';
+      } else if (/\b(stop|silence|cancel)\b/i.test(text)) {
+        resolvedIntent = 'STOP';
+      } else if (/\b(repeat|again)\b/i.test(text)) {
+        resolvedIntent = 'REPEAT';
+      } else if (/\b(help|commands|options)\b/i.test(text)) {
+        resolvedIntent = 'HELP';
+      }
+    }
+
+    return {
+      intent: resolvedIntent,
+      target,
+      raw: transcript,
+    };
   }
 }
 

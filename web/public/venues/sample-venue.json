@@ -1,0 +1,14 @@
+{
+  "id": "amc-cse-building",
+  "name": "AMC Engineering College - CSE Building",
+  "floors": [
+    {
+      "floor": 1,
+      "landmarks": [
+        { "id": "entrance", "name": "Main Entrance", "x": 0, "y": 0, "cues": ["double glass doors", "reception desk"] },
+        { "id": "restroom", "name": "Restroom", "x": 10, "y": 15, "cues": ["blue sign with pictograms", "tactile board"] },
+        { "id": "lab_101", "name": "AI/ML Lab 101", "x": -15, "y": 20, "cues": ["wooden door", "sign 'AI/ML Lab'"] }
+      ]
+    }
+  ]
+}

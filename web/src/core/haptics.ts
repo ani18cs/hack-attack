@@ -23,6 +23,20 @@ export const haptics = {
     }
   },
 
+  /** Rhythmic triple pulse when landmark or target is spotted */
+  pulseFound: () => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([150, 50, 150]);
+    }
+  },
+
+  /** Long error buzz when operation fails */
+  pulseError: () => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(400);
+    }
+  },
+
   /** Cancel active vibration */
   cancel: () => {
     if ('vibrate' in navigator) {

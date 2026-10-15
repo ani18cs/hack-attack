@@ -1,4 +1,4 @@
-import { SpeakPriority } from '../types';
+import { settings } from './settings';
 
 export interface SpeakOptions {
   priority?: SpeakPriority;
@@ -68,6 +68,11 @@ class SpeechController {
     }
 
     const priority = options.priority || 'normal';
+
+    // Respect Verbosity: quiet speaks hazards only
+    if (settings.getSettings().verbosity === 'quiet' && priority !== 'danger') {
+      return;
+    }
 
     if (priority === 'danger') {
       // Danger immediately interrupts everything

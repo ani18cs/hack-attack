@@ -1,100 +1,134 @@
-import { DescribeResponse, FindResponse, HealthResponse, ReadResponse } from '../types';
+import type {
+  AnalyzeRequest,
+  AnalyzeResponse,
+  DescribeData,
+  FindData,
+  HealthResponse,
+  ReadData,
+  VisionTask,
+} from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 10000): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// Track one in-flight AbortController per task to cancel previous requests
+const inFlightControllers = new Map<VisionTask, AbortController>();
 
 export const api = {
+  /**
+   * Cancel any in-flight request for a specific task.
+   */
+  abortTask: (task: VisionTask): void => {
+    const existing = inFlightControllers.get(task);
+    if (existing) {
+      existing.abort();
+      inFlightControllers.delete(task);
+    }
+  },
+
+  /**
+   * Cancel all in-flight requests (e.g. on mode switch).
+   */
+  abortAll: (): void => {
+    for (const [task, controller] of inFlightControllers.entries()) {
+      controller.abort();
+      inFlightControllers.delete(task);
+    }
+  },
+
+  /**
+   * Check backend server health.
+   */
   checkHealth: async (): Promise<HealthResponse> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/health`, { method: 'GET' }, 5000);
+      const res = await fetch(`${API_BASE}/api/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.error('Health check failed:', err);
+      console.warn('[SightLine API] Health check failed:', err);
       return { ok: false };
+    } finally {
+      clearTimeout(timer);
     }
   },
 
-  describeScene: async (imageBase64: string, lang = 'en'): Promise<DescribeResponse> => {
-    try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/describe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, lang }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with ${res.status}`);
-      }
-      return await res.json();
-    } catch (err: any) {
-      console.error('describeScene error:', err);
-      return {
-        summary: "I'm having trouble connecting to the vision server.",
-        objects: [],
-        error: err.message,
-      };
-    }
-  },
+  /**
+   * Unified analysis endpoint.
+   * Enforces 1 in-flight request per task, handles aborts, and applies timeouts.
+   */
+  analyze: async <T = any>(
+    req: AnalyzeRequest,
+    timeoutMs = 10000
+  ): Promise<AnalyzeResponse<T>> => {
+    // 1. Abort existing request for the same task
+    api.abortTask(req.task);
 
-  readText: async (imageBase64: string, lang = 'en'): Promise<ReadResponse> => {
-    try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, lang }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with ${res.status}`);
-      }
-      return await res.json();
-    } catch (err: any) {
-      console.error('readText error:', err);
-      return {
-        summary: 'Cannot read text right now.',
-        texts: [],
-        error: err.message,
-      };
-    }
-  },
+    const controller = new AbortController();
+    inFlightControllers.set(req.task, controller);
 
-  findTarget: async (imageBase64: string, target = 'restroom', lang = 'en'): Promise<FindResponse> => {
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    const startTime = Date.now();
+
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/find`, {
+      const res = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, target, lang }),
+        body: JSON.stringify(req),
+        signal: controller.signal,
       });
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with ${res.status}`);
+        throw new Error(errorData.error || `Server responded with HTTP ${res.status}`);
       }
-      return await res.json();
+
+      const result: AnalyzeResponse<T> = await res.json();
+      return result;
     } catch (err: any) {
-      console.error('findTarget error:', err);
+      if (err.name === 'AbortError') {
+        return {
+          task: req.task,
+          ok: false,
+          summary: '',
+          confidence: 0,
+          data: null as any,
+          error: 'Request cancelled or timed out',
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      console.error(`[SightLine API] Task "${req.task}" error:`, err.message);
       return {
-        found: false,
-        direction: 'unknown',
-        gender: 'unknown',
+        task: req.task,
+        ok: false,
+        summary: 'Cannot reach vision server. Please check your network connection.',
         confidence: 0,
-        cue: '',
-        error: err.message,
+        data: null as any,
+        error: err.message || 'Network request failed',
+        latencyMs: Date.now() - startTime,
       };
+    } finally {
+      clearTimeout(timer);
+      if (inFlightControllers.get(req.task) === controller) {
+        inFlightControllers.delete(req.task);
+      }
     }
   },
+
+  // Convenience typed wrappers:
+  describe: (image: string, lang = 'en') =>
+    api.analyze<DescribeData>({ task: 'describe', image, lang }),
+
+  read: (image: string, lang = 'en') =>
+    api.analyze<ReadData>({ task: 'read', image, lang }),
+
+  find: (image: string, target = 'restroom', lang = 'en') =>
+    api.analyze<FindData>({ task: 'find', image, target, lang }),
 };

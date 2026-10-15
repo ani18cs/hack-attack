@@ -2,8 +2,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import { analyzeRouter } from './routes/analyze.js';
+import { healthRouter } from './routes/health.js';
 import { ttsRouter } from './routes/tts.js';
-import { visionRouter } from './routes/vision.js';
 
 // Load environment variables
 dotenv.config();
@@ -50,19 +51,9 @@ app.use(
 // Body parser with 5MB limit for Base64 image payload
 app.use(express.json({ limit: '5mb' }));
 
-// Health check endpoint
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    timestamp: Date.now(),
-    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-    hasApiKey: !!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('PLACEHOLDER'),
-    hasSarvamKey: !!process.env.SARVAM_API_KEY && !process.env.SARVAM_API_KEY.includes('PLACEHOLDER'),
-  });
-});
-
-// Vision & TTS proxy routes
-app.use('/api', visionRouter);
+// Mount API routes
+app.use('/api', healthRouter);
+app.use('/api', analyzeRouter);
 app.use('/api', ttsRouter);
 
 // Global 404 handler
