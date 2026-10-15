@@ -228,13 +228,13 @@ export interface AnalyzeResponse<T = any> {
 
 ---
 
-## 7. Team & Role Distribution
+## 7. Team CLOVER & Role Distribution
 
-| Role | Focus | Primary Directories | Feature Branch |
+| Role & Member | Focus | Primary Directories | Feature Branch |
 |---|---|---|---|
-| **Role A** (App / A11y Lead) | App shell, big buttons, voice router, speech priority queue, earcons, settings, SOS, venue nav | `web/src/app`, `web/src/components`, `web/src/core/*` | `feat/app-shell` |
-| **Role B** (Vision Lead) | COCO-SSD detector, spatial math, danger heuristics, announcer, 3D audio beacon, obstacle alert, judge overlay | `web/src/vision/detector,spatial,announcer`, `web/src/core/spatialAudio.ts`, `web/src/modes/ObstacleAlert,AroundMe` | `feat/vision-core` |
-| **Role C** (AI & Server Lead) | Express app, Gemini wrapper, task registry (`describe`, `read`, `find`), offline mock fixtures, OCR fallback | `server/*`, `web/src/vision/api.ts,ocr.ts`, `docs/*` | `feat/server-analyze` |
+| **Role A: Aniket Kumar Singh** (Team Lead / App & A11y) | App shell, big buttons, voice router, speech priority queue, earcons, settings, SOS, venue nav | `web/src/app`, `web/src/components`, `web/src/core/*` | `feat/app-shell` |
+| **Role B: Hrishita Shenvi** (Vision & Spatial Lead) | COCO-SSD detector, spatial math, danger heuristics, announcer, 3D audio beacon, obstacle alert, judge overlay | `web/src/vision/detector,spatial,announcer`, `web/src/core/spatialAudio.ts`, `web/src/modes/ObstacleAlert,AroundMe` | `feat/vision-core` |
+| **Role C: Samiksha R Singi** (AI & Server Lead) | Express app, Gemini wrapper, task registry (`describe`, `read`, `find`), offline mock fixtures, OCR fallback | `server/*`, `web/src/vision/api.ts,ocr.ts`, `docs/*` | `feat/server-analyze` |
 
 ### Git & Collaboration Directives
 1. Never push directly to `main`.

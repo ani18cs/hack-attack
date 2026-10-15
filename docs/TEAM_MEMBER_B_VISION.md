@@ -1,6 +1,6 @@
 # 👁️ Team Member B: Computer Vision & Spatial Lead
 
-> **Assigned to:** Team Member B (Vision Lead)  
+> **Assigned to:** Hrishita Shenvi (Team CLOVER Vision Lead)  
 > **Role Scope:** Camera Stream Integration, On-Device COCO-SSD Object Detection, Spatial Calculations (Direction/Distance/Danger), Anti-Chatter Announcer, Obstacle Alert Mode, and Continuous Around Me Mode.  
 > **Working Branch:** `feat/vision-spatial`  
 > **Primary Directory Ownership:** `web/src/vision/detector.ts`, `spatial.ts`, `announcer.ts`, `web/src/modes/ObstacleAlert.tsx`, `web/src/modes/AroundMe.tsx`

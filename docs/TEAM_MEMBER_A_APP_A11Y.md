@@ -1,6 +1,6 @@
 # 📱 Team Member A: App & Accessibility Lead
 
-> **Assigned to:** Team Member A (Repo Owner / App Lead)  
+> **Assigned to:** Aniket Kumar Singh (Team CLOVER Lead / App Lead)  
 > **Role Scope:** App Shell, Touch Targets, Voice Commands, Speech Priority Queue, Multilingual Support (Sarvam AI), Haptics, PWA Configuration, and Deployment.  
 > **Working Branch:** `feat/app-shell`  
 > **Primary Directory Ownership:** `web/src/app/`, `web/src/components/`, `web/src/core/`

@@ -9,14 +9,21 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment variables
+# Environment variables & secrets (NEVER COMMIT)
+*.env
+*.env.*
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-server/.env
-web/.env
+server/.env*
+web/.env*
+!.env.example
+!*.env.example
+!server/.env.example
+!web/.env.example
 
 # Logs
 npm-debug.log*

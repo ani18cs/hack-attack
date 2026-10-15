@@ -1,6 +1,6 @@
 # 🧠 Team Member C: AI, Server Proxy & Flagship Modes Lead
 
-> **Assigned to:** Team Member C (AI & Server Lead)  
+> **Assigned to:** Samiksha R Singi (Team CLOVER AI & Server Lead)  
 > **Role Scope:** Express Proxy Server, Google Gemini 3.8 Flash Vision Prompts & Schemas, Sarvam AI Indic TTS & Translation, Read Mode (Signs/Text), Find Washroom (Flagship Demo State Machine), Tesseract Offline Fallback, Demo Script, and Slides.  
 > **Working Branch:** `feat/server-gemini`  
 > **Primary Directory Ownership:** `server/*`, `web/src/vision/api.ts`, `web/src/vision/ocr.ts`, `web/src/modes/Read.tsx`, `web/src/modes/FindWashroom.tsx`, `docs/DEMO_SCRIPT.md`, `docs/LIMITATIONS.md`
