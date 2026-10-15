@@ -40,5 +40,11 @@ export default defineConfig({
     port: 5173,
     // Allow tunnel services like cloudflared, ngrok, and local IP access
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
   },
 });

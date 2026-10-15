@@ -8,7 +8,7 @@ import type {
   VisionTask,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 // Track one in-flight AbortController per task to cancel previous requests
 const inFlightControllers = new Map<VisionTask, AbortController>();
