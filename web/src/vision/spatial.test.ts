@@ -65,20 +65,25 @@ describe('Spatial Engine Unit Tests', () => {
 
   describe('isHazardous (Danger Rules)', () => {
     it('flags large objects directly in walking corridor as hazardous', () => {
+      // Centered (x=0.5), low walking path (y=0.6), large area (0.28)
       expect(isHazardous(0.5, 0.6, 0.28)).toBe(true);
     });
 
     it('does NOT flag small items in path as immediate danger', () => {
+      // Centered but small area (< 0.08)
       expect(isHazardous(0.5, 0.6, 0.05)).toBe(false);
     });
 
     it('does NOT flag large objects outside walking path', () => {
+      // Large object at extreme left (x=0.1)
       expect(isHazardous(0.1, 0.6, 0.35)).toBe(false);
+      // Large object high in sky/ceiling (y=0.15)
       expect(isHazardous(0.5, 0.15, 0.35)).toBe(false);
     });
 
     it('flags rapidly approaching objects in corridor via growth delta', () => {
-      expect(isHazardous(0.5, 0.5, 0.18, 0.10)).toBe(true);
+      // Area grew from 0.10 to 0.18 (> 40% growth) in corridor
+      expect(isHazardous(0.5, 0.5, 0.18, 0.1)).toBe(true);
     });
   });
 
@@ -87,6 +92,7 @@ describe('Spatial Engine Unit Tests', () => {
       const frameWidth = 1000;
       const frameHeight = 1000;
 
+      // Detection right in front: center around (500, 600), size (400x500)
       const detection: RawDetection = {
         label: 'chair',
         score: 0.88,

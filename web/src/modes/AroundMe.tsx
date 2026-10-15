@@ -3,6 +3,7 @@ import { BigButton } from '../components/BigButton';
 import { ModeScreen } from '../components/ModeScreen';
 import { camera } from '../core/camera';
 import { confidencePhrase, speech } from '../core/speech';
+import type { SceneObject } from '../types';
 import { announcer } from '../vision/announcer';
 import { api } from '../vision/api';
 import { detector } from '../vision/detector';
@@ -13,21 +14,81 @@ interface AroundMeProps {
   onDescribeOnce?: () => void;
 }
 
-export const AroundMe: React.FC<AroundMeProps> = ({ onStop }) => {
+export const AroundMe: React.FC<AroundMeProps> = ({
+  onStop,
+  onDescribeOnce,
+}) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isContinuous, setIsContinuous] = useState(false);
   const [lastSummary, setLastSummary] = useState('Tap "Describe Scene" or ask "What is in front of me?"');
-  const animFrameRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
+  const [objects, setObjects] = useState<SceneObject[]>([]);
+  const [status, setStatus] = useState('Monitoring surroundings');
+  const objectsRef = useRef<SceneObject[]>([]);
+
+  // Real-time on-device spatial tracking
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+
+    const start = async () => {
+      try {
+        const video = camera.getVideoElement();
+        if (!video) {
+          setStatus('Camera unavailable. Tap start to initialize.');
+          return;
+        }
+
+        await detector.loadModel();
+        if (!active) return;
+
+        unsubscribe = detector.subscribe((detections) => {
+          if (!active || video.videoWidth === 0 || video.videoHeight === 0) {
+            return;
+          }
+
+          const nextObjects = detections.map((detection) =>
+            processSpatialObject(
+              detection,
+              video.videoWidth,
+              video.videoHeight
+            )
+          );
+
+          objectsRef.current = nextObjects;
+          setObjects(nextObjects);
+          announcer.process(nextObjects);
+          setStatus('Detecting surroundings');
+        });
+
+        detector.startDetection(video);
+      } catch (error) {
+        console.error('Around Me detection failed:', error);
+        if (active) {
+          setStatus('Could not load vision model. Please try again.');
+        }
+      }
+    };
+
+    void start();
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+      announcer.reset();
+      objectsRef.current = [];
+    };
+  }, []);
 
   // Trigger detailed scene description via unified POST /api/analyze task="describe"
   const handleDescribe = async () => {
+    if (onDescribeOnce) {
+      onDescribeOnce();
+    }
     if (isAnalyzing) return;
     setIsAnalyzing(true);
     speech.speak('Looking...', { priority: 'normal' });
 
     try {
-      const frame = camera.captureFrame(1024, 0.7);
+      const frame = camera.captureFrame(720, 0.65);
       if (!frame) {
         speech.speak('Camera not ready. Please try again.', { priority: 'normal' });
         setIsAnalyzing(false);
@@ -52,80 +113,16 @@ export const AroundMe: React.FC<AroundMeProps> = ({ onStop }) => {
     }
   };
 
-  // Toggle continuous COCO-SSD detection stream
-  const toggleContinuous = () => {
-    setIsContinuous((prev) => {
-      const next = !prev;
-      speech.speak(next ? 'Continuous announcements on.' : 'Continuous announcements paused.', {
-        priority: 'normal',
-      });
-      return next;
-    });
-  };
-
-  // Continuous COCO-SSD detection loop (5-10 FPS time-gated)
-  useEffect(() => {
-    if (!isContinuous) {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      return;
-    }
-
-    let isMounted = true;
-
-    const detectLoop = async (now: number) => {
-      if (!isMounted) return;
-
-      // Throttle to ~8 FPS (approx 125ms per frame)
-      if (now - lastTimeRef.current >= 125) {
-        lastTimeRef.current = now;
-        const video = camera.getVideoElement();
-        if (video && video.readyState >= 2) {
-          try {
-            const rawDetections = await detector.detect(video);
-            const spatialObjects = rawDetections.map((det) =>
-              processSpatialObject(det, video.videoWidth || 640, video.videoHeight || 480)
-            );
-            announcer.process(spatialObjects);
-          } catch (e) {
-            console.warn('Continuous detection frame error:', e);
-          }
-        }
-      }
-
-      animFrameRef.current = requestAnimationFrame(detectLoop);
-    };
-
-    animFrameRef.current = requestAnimationFrame(detectLoop);
-
-    return () => {
-      isMounted = false;
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-    };
-  }, [isContinuous]);
-
-  // Clean up in-flight requests on exit
-  useEffect(() => {
-    return () => {
-      api.abortTask('describe');
-    };
-  }, []);
-
   return (
     <ModeScreen
       title="Around Me"
-      description={isContinuous ? 'Continuously scanning walking path...' : 'Scene awareness assistant'}
+      description="Scene awareness & real-time spatial object tracker"
       onStop={onStop}
     >
-      <div className="w-full flex flex-col gap-4">
+      <div className="w-full flex flex-col gap-3 max-h-[62vh] overflow-y-auto px-1">
         {/* Real-time summary display */}
         <div
-          className="p-5 rounded-2xl bg-zinc-900 border-2 border-yellow-400 text-zinc-100 text-base font-medium shadow-md text-center min-h-[90px] flex items-center justify-center"
+          className="p-4 rounded-2xl bg-zinc-900 border-2 border-yellow-400 text-zinc-100 text-base font-medium shadow-md text-center min-h-[75px] flex items-center justify-center"
           aria-live="polite"
         >
           {isAnalyzing ? (
@@ -135,29 +132,56 @@ export const AroundMe: React.FC<AroundMeProps> = ({ onStop }) => {
           )}
         </div>
 
-        {/* Big tactile action button */}
+        {/* Big tactile action button for AI scene description */}
         <BigButton
-          label={isAnalyzing ? 'Looking...' : 'Describe Scene'}
+          label={isAnalyzing ? 'Looking...' : 'Describe Scene (AI)'}
           variant="primary"
           onClick={handleDescribe}
           disabled={isAnalyzing}
-          className="w-full py-8 text-2xl"
+          className="w-full py-7 text-2xl"
           icon="👁️"
           ariaDescription="Captures a frame and describes what is in front of you"
         />
 
-        {/* Continuous mode toggle */}
-        <BigButton
-          label={isContinuous ? 'Pause Continuous Scan' : 'Continuous Scan'}
-          variant={isContinuous ? 'warning' : 'neutral'}
-          onClick={toggleContinuous}
-          className="w-full py-6 text-xl"
-          icon={isContinuous ? '⏸️' : '▶️'}
-          ariaDescription="Continuously announce obstacles and nearby objects"
-        />
+        {/* Real-time detected objects list */}
+        <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-3.5">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+              Real-Time Tracks ({objects.length})
+            </h2>
+            <span className="text-xs text-zinc-400">{status}</span>
+          </div>
 
-        <div className="text-center text-xs text-zinc-400 mt-2">
-          Voice shortcuts: "What's in front of me", "Keep telling me what's around", or "Stop"
+          {objects.length === 0 ? (
+            <p className="text-xs text-zinc-400 text-center py-2">
+              Scanning for objects in camera view...
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {objects.slice(0, 5).map((object, index) => (
+                <li
+                  key={`${object.label}-${object.direction}-${index}`}
+                  className={`rounded-xl p-2.5 text-xs flex items-center justify-between font-mono ${
+                    object.danger
+                      ? 'bg-red-950/80 border border-red-500 text-red-200 font-bold animate-pulse'
+                      : 'bg-zinc-800 border border-zinc-700 text-zinc-200'
+                  }`}
+                >
+                  <span className="font-bold text-yellow-300 uppercase">
+                    {object.danger ? '⚠️ ' : ''}
+                    {object.label}
+                  </span>
+                  <span>
+                    {object.direction} · {object.distance}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="text-center text-xs text-zinc-400">
+          Voice shortcuts: "What's in front of me", "Around me", or "Stop"
         </div>
       </div>
     </ModeScreen>
